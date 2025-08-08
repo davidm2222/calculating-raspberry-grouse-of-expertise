@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Smart Note-Taking App</title>
+<style>
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+      Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
+    margin: 0;
+    padding: 0;
+    background: #f7f9fc;
+    color: #202020;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+  }
+  header {
+    background: #4a90e2;
+    color: white;
+    padding: 1.2rem 1rem;
+    text-align: center;
+    font-weight: 700;
+    font-size: 1.5rem;
+  }
+  main {
+    flex: 1;
+    max-width: 900px;
+    margin: 1.5rem auto 2rem;
+    padding: 0 1rem;
+    width: 100%;
+  }
+  form {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1.5rem;
+  }
+  input#noteInput {
+    flex: 1;
+    font-size: 1rem;
+    padding: 0.6rem 1rem;
+    border-radius: 5px;
+    border: 2px solid #ccc;
+    transition: border-color 0.25s ease;
+  }
+  input#noteInput:focus {
+    outline: none;
+    border-color: #4a90e2;
+  }
+  button {
+    background: #4a90e2;
+    color: white;
+    border: none;
+    font-weight: 600;
+    border-radius: 5px;
+    padding: 0 1.2rem;
+    cursor: pointer;
+    transition: background-color 0.25s ease;
+  }
+  button:hover {
+    background: #3b78c1;
+  }
+  section.notes-category {
+    margin-bottom: 2.5rem;
+  }
+  section.notes-category h2 {
+    font-size: 1.4rem;
+    border-bottom: 2px solid #4a90e2;
+    padding-bottom: 0.3rem;
+    margin-bottom: 0.7rem;
+  }
+  ul.note-list {
+    list-style-type: none;
+    padding-left: 0;
+  }
+  ul.note-list li {
+    background: white;
+    border-radius: 5px;
+    padding: 0.8rem 1rem;
+    margin-bottom: 0.5rem;
+    box-shadow: 0 1px 4px rgb(0 0 0 / 0.1);
+    word-break: break-word;
+  }
+  ul.note-list li small {
+    display: block;
+    margin-top: 0.3rem;
+    font-size: 0.85rem;
+    color: #666;
+  }
+  footer {
+    text-align: center;
+    font-size: 0.9rem;
+    padding: 1rem 0;
+    color: #888;
+  }
+  @media (max-width: 500px) {
+    button {
+      padding: 0 0.8rem;
+    }
+  }
+</style>
+</head>
+<body>
+<header>Smart Note-Taking App</header>
+<main>
+  <form id="noteForm" autocomplete="off" aria-label="Add new note">
+    <input id="noteInput" type="text" placeholder='Type a new note (e.g. "Book: Sapiens by Yuval Harari", "Restaurant: Il Pastaio, Italian, Beverly Hills")' aria-describedby="noteHelp" />
+    <button type="submit" aria-label="Add note">Add</button>
+  </form>
+  <div id="notesContainer" aria-live="polite">
+    <section class="notes-category" id="booksSection" aria-label="Book notes">
+      <h2>Books</h2>
+      <ul class="note-list" id="booksList"></ul>
+    </section>
+    <section class="notes-category" id="restaurantsSection" aria-label="Restaurant notes">
+      <h2>Restaurants</h2>
+      <ul class="note-list" id="restaurantsList"></ul>
+    </section>
+    <section class="notes-category" id="projectsSection" aria-label="Project notes">
+      <h2>Projects & Other Notes</h2>
+      <ul class="note-list" id="projectsList"></ul>
+    </section>
+  </div>
+</main>
+<footer>
+  Type notes starting with <code>Book:</code>, <code>Restaurant:</code>, or any other text will go to Projects & Other Notes.<br />
+  Example: <em>Restaurant: Sushi Nakazawa, Japanese, NYC</em>
+</footer>
+<script>
+  (() => {
+    const noteForm = document.getElementById("noteForm");
+    const noteInput = document.getElementById("noteInput");
+    const booksList = document.getElementById("booksList");
+    const restaurantsList = document.getElementById("restaurantsList");
+    const projectsList = document.getElementById("projectsList");
+
+    // Storage keys
+    const STORAGE_KEY = "smartNotesAppData";
+
+    // Load notes from localStorage
+    let notesData = { books: [], restaurants: [], projects: [] };
+    function loadNotes() {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (parsed.books && Array.isArray(parsed.books)) notesData.books = parsed.books;
+          if (parsed.restaurants && Array.isArray(parsed.restaurants)) notesData.restaurants = parsed.restaurants;
+          if (parsed.projects && Array.isArray(parsed.projects)) notesData.projects = parsed.projects;
+        } catch (e) {
+          // corrupted or invalid data, ignore
+          localStorage.removeItem(STORAGE_KEY);
+        }
+      }
+    }
+
+    // Save notes to localStorage
+    function saveNotes() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(notesData));
+    }
+
+    // Sanitize and escape HTML for display
+    function escapeHTML(str) {
+      return str.replace(/[&<>"']/g, function (m) {
+        return {
+          "&": "&amp;",
+          "<": "&lt;",
+          ">": "&gt;",
+          '"': "&quot;",
+          "'": "&#39;",
+        }[m];
+      });
+    }
+
+    // Create list item element for a note
+    // Displays main title in bold and details below if present
+    function createListItem(note) {
+      const li = document.createElement("li");
+      if (note.title && note.details) {
+        li.innerHTML = `<strong>${escapeHTML(note.title)}</strong><small>${escapeHTML(note.details)}</small>`;
+      } else {
+        li.textContent = escapeHTML(note.raw);
+      }
+      return li;
+    }
+
+    // Render all lists
+    function renderNotes() {
+      booksList.innerHTML = "";
+      restaurantsList.innerHTML = "";
+      projectsList.innerHTML = "";
+
+      if (notesData.books.length === 0) {
+        booksList.innerHTML = "<li><em>No book notes yet.</em></li>";
+      } else {
+        notesData.books.forEach((note) => {
+          booksList.appendChild(createListItem(note));
+        });
+      }
+
+      if (notesData.restaurants.length === 0) {
+        restaurantsList.innerHTML = "<li><em>No restaurant notes yet.</em></li>";
+      } else {
+        notesData.restaurants.forEach((note) => {
+          restaurantsList.appendChild(createListItem(note));
+        });
+      }
+
+      if (notesData.projects.length === 0) {
+        projectsList.innerHTML = "<li><em>No project or general notes yet.</em></li>";
+      } else {
+        notesData.projects.forEach((note) => {
+          projectsList.appendChild(createListItem(note));
+        });
+      }
+    }
+
+    // Parse input string for note type and details
+    // It expects format: "Type: Info, more info, ..."
+    // Returns an object { category, title, details, raw }
+    // Categories: 'books', 'restaurants', 'projects' (default)
+    function parseNoteInput(text) {
+      const raw = text.trim();
+      // Detect type prefix (case-insensitive)
+      // The pattern: "Type: content"
+      const typeMatch = raw.match(/^([a-zA-Z]+)\s*:\s*(.+)$/);
+      if (!typeMatch) {
+        // No prefix, default to projects
+        return {
+          category: "projects",
+          raw,
+          title: "",
+          details: raw,
+        };
+      }
+      const prefix = typeMatch[1].toLowerCase();
+      const content = typeMatch[2].trim();
+
+      // Heuristic split for title vs details:
+      // For books: first comma or '-' separates title from author or notes
+      // For restaurants: first comma or '-' separates name from style/location
+      // For other types, just keep all content as details
+
+      let category;
+      if (prefix === "book" || prefix === "books") category = "books";
+      else if (prefix === "restaurant" || prefix === "restaurants") category = "restaurants";
+      else category = "projects";
+
+      let title = "";
+      let details = "";
+
+      // Split on first comma or dash if any
+      // Trim spaces
+      const splitRegex = /[,–-]/; // includes dash and en dash (–)
+      const firstSepIndex = content.search(splitRegex);
+      if (firstSepIndex === -1) {
+        // No separator found - all is title for books/restaurants, or details for projects
+        if (category === "books" || category === "restaurants") {
+          title = content;
+          details = "";
+        } else {
+          title = "";
+          details = content;
+        }
+      } else {
+        title = content.slice(0, firstSepIndex).trim();
+        details = content.slice(firstSepIndex + 1).trim();
+      }
+
+      // Return the parsed note object with original raw too
+      return {
+        category,
+        raw,
+        title,
+        details,
+      };
+    }
+
+    // Add note to appropriate category list and save & render
+    function addNote(note) {
+      if (note.category === "books") {
+        notesData.books.unshift(note);
+      } else if (note.category === "restaurants") {
+        notesData.restaurants.unshift(note);
+      } else {
+        notesData.projects.unshift(note);
+      }
+      saveNotes();
+      renderNotes();
+    }
+
+    // On form submit
+    noteForm.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const inputVal = noteInput.value.trim();
+      if (!inputVal) return;
+
+      const note = parseNoteInput(inputVal);
+      addNote(note);
+
+      noteInput.value = "";
+      noteInput.focus();
+    });
+
+    // Initialize app
+    loadNotes();
+    renderNotes();
+  })();
+</script>
+</body>
+</html>
