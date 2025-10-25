@@ -54,6 +54,7 @@
   }
   input#noteInput {
     width: 100%;
+    box-sizing: border-box;
     font-size: 1rem;
     padding: 0.6rem 1rem;
     border-radius: 5px;
@@ -67,18 +68,35 @@
     outline: none;
     border-color: #4a90e2;
   }
+  .search-bar-container {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1.5rem;
+    align-items: center;
+  }
   input#searchInput {
-    width: 100%;
+    flex: 1;
     font-size: 1rem;
     padding: 0.6rem 1rem;
     border-radius: 5px;
     border: 2px solid #ccc;
     transition: border-color 0.25s ease;
-    margin-bottom: 1.5rem;
   }
   input#searchInput:focus {
     outline: none;
     border-color: #4a90e2;
+  }
+  .view-toggle {
+    background: white;
+    color: #4a90e2;
+    border: 2px solid #4a90e2;
+    padding: 0.6rem 1rem;
+    font-size: 0.9rem;
+    white-space: nowrap;
+  }
+  .view-toggle:hover {
+    background: #4a90e2;
+    color: white;
   }
   button {
     background: #4a90e2;
@@ -126,6 +144,21 @@
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
+    transition: padding 0.2s ease;
+  }
+  /* Compact view styles */
+  .compact-view ul.note-list li {
+    padding: 0.4rem 0.8rem;
+    margin-bottom: 0.25rem;
+  }
+  .compact-view ul.note-list li .note-content small,
+  .compact-view ul.note-list li .note-content .fields,
+  .compact-view ul.note-list li .note-content .tags,
+  .compact-view ul.note-list li .note-content .timestamp {
+    display: none;
+  }
+  .compact-view ul.note-list li .note-content strong {
+    font-size: 0.95rem;
   }
   ul.note-list li .note-content {
     flex: 1;
@@ -329,7 +362,10 @@
     <button type="submit" aria-label="Add note">Add</button>
   </form>
 
-  <input id="searchInput" type="text" placeholder="Search notes..." aria-label="Search notes" />
+  <div class="search-bar-container">
+    <input id="searchInput" type="text" placeholder="Search notes..." aria-label="Search notes" />
+    <button class="view-toggle" id="viewToggle" aria-label="Toggle view">Compact</button>
+  </div>
 
   <div class="tabs" role="tablist">
     <button class="tab active" data-category="book" role="tab" aria-selected="true">Books</button>
@@ -393,6 +429,8 @@
     const noteInput = document.getElementById("noteInput");
     const autocompleteGhost = document.getElementById("autocompleteGhost");
     const searchInput = document.getElementById("searchInput");
+    const viewToggle = document.getElementById("viewToggle");
+    const notesContainer = document.getElementById("notesContainer");
     const booksList = document.getElementById("booksList");
     const moviesList = document.getElementById("moviesList");
     const showsList = document.getElementById("showsList");
@@ -410,6 +448,7 @@
     const STORAGE_KEY = "smartNotesAppData";
     const AUTOCOMPLETE_KEY = "smartNotesAutocomplete";
     const ACTIVE_TAB_KEY = "smartNotesActiveTab";
+    const VIEW_MODE_KEY = "smartNotesViewMode";
 
     // Define categories
     const CATEGORIES = {
@@ -426,6 +465,7 @@
     let searchQuery = "";
     let autocompleteData = { keys: {}, values: {} }; // Track field keys and their values
     let activeTab = 'book'; // Default to Books tab
+    let viewMode = 'comfort'; // 'compact' or 'comfort'
 
     function loadNotes() {
       const saved = localStorage.getItem(STORAGE_KEY);
@@ -564,6 +604,37 @@
         const isActive = key === categoryKey;
         category.sectionEl.classList.toggle('active', isActive);
       });
+    }
+
+    // Load view mode from localStorage
+    function loadViewMode() {
+      const saved = localStorage.getItem(VIEW_MODE_KEY);
+      if (saved && (saved === 'compact' || saved === 'comfort')) {
+        viewMode = saved;
+      }
+    }
+
+    // Save view mode to localStorage
+    function saveViewMode() {
+      localStorage.setItem(VIEW_MODE_KEY, viewMode);
+    }
+
+    // Toggle between compact and comfort view
+    function toggleView() {
+      viewMode = viewMode === 'compact' ? 'comfort' : 'compact';
+      saveViewMode();
+      updateViewMode();
+    }
+
+    // Update UI based on view mode
+    function updateViewMode() {
+      if (viewMode === 'compact') {
+        notesContainer.classList.add('compact-view');
+        viewToggle.textContent = 'Comfort';
+      } else {
+        notesContainer.classList.remove('compact-view');
+        viewToggle.textContent = 'Compact';
+      }
     }
 
     // Sanitize and escape HTML for display
@@ -1025,6 +1096,8 @@
       renderNotes();
     });
 
+    viewToggle.addEventListener("click", toggleView);
+
     saveEditBtn.addEventListener("click", saveEdit);
     cancelEditBtn.addEventListener("click", closeEditModal);
 
@@ -1046,7 +1119,9 @@
     loadNotes();
     loadAutocompleteData();
     loadActiveTab();
+    loadViewMode();
     switchTab(activeTab); // Set the active tab
+    updateViewMode(); // Set the view mode
     renderNotes();
   })();
 </script>
