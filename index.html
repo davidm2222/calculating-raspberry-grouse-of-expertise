@@ -153,13 +153,15 @@
     margin-bottom: 0.25rem;
   }
   .compact-view ul.note-list li .note-content small,
-  .compact-view ul.note-list li .note-content .fields,
   .compact-view ul.note-list li .note-content .tags,
   .compact-view ul.note-list li .note-content .timestamp {
     display: none;
   }
   .compact-view ul.note-list li .note-content strong {
     font-size: 0.95rem;
+  }
+  .compact-view ul.note-list li .note-content .fields {
+    margin-top: 0.25rem;
   }
   ul.note-list li .note-content {
     flex: 1;
@@ -960,11 +962,12 @@
       }
 
       if (suggestion) {
-        // Calculate the ghost text position
+        // Show only the suggestion, positioned after existing text
         const beforeText = inputValue.substring(0, cursorPos);
-        autocompleteGhost.textContent = beforeText + suggestion;
+        // Use HTML to make beforeText invisible (for spacing) and suggestion visible
+        autocompleteGhost.innerHTML = `<span style="color: transparent;">${escapeHTML(beforeText)}</span><span style="color: #ccc;">${escapeHTML(suggestion)}</span>`;
       } else {
-        autocompleteGhost.textContent = '';
+        autocompleteGhost.innerHTML = '';
       }
     }
 
@@ -1081,7 +1084,7 @@
       addNote(note);
 
       noteInput.value = "";
-      autocompleteGhost.textContent = "";
+      autocompleteGhost.innerHTML = "";
       noteInput.focus();
     });
 
