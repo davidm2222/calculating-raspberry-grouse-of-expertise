@@ -47,6 +47,7 @@
     white-space: pre;
     font-family: inherit;
     box-sizing: border-box;
+    line-height: 1.5;
   }
   form {
     display: flex;
@@ -64,6 +65,7 @@
     background: transparent;
     position: relative;
     z-index: 1;
+    line-height: 1.5;
   }
   input#noteInput:focus {
     outline: none;
@@ -152,6 +154,12 @@
     padding: 0.4rem 0.8rem;
     margin-bottom: 0.25rem;
   }
+  .compact-view ul.note-list li .note-content {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    overflow: hidden;
+  }
   .compact-view ul.note-list li .note-content small,
   .compact-view ul.note-list li .note-content .tags,
   .compact-view ul.note-list li .note-content .timestamp {
@@ -159,9 +167,15 @@
   }
   .compact-view ul.note-list li .note-content strong {
     font-size: 0.95rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex-shrink: 1;
+    min-width: 0;
   }
   .compact-view ul.note-list li .note-content .fields {
-    margin-top: 0.25rem;
+    margin-top: 0;
+    flex-shrink: 0;
   }
   ul.note-list li .note-content {
     flex: 1;
