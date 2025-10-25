@@ -31,18 +31,36 @@
     padding: 0 1rem;
     width: 100%;
   }
+  .input-wrapper {
+    position: relative;
+    flex: 1;
+  }
+  .autocomplete-ghost {
+    position: absolute;
+    left: 0;
+    top: 0;
+    color: #ccc;
+    pointer-events: none;
+    font-size: 1rem;
+    padding: 0.6rem 1rem;
+    white-space: pre;
+    font-family: inherit;
+  }
   form {
     display: flex;
     gap: 0.5rem;
     margin-bottom: 1rem;
   }
   input#noteInput {
-    flex: 1;
+    width: 100%;
     font-size: 1rem;
     padding: 0.6rem 1rem;
     border-radius: 5px;
     border: 2px solid #ccc;
     transition: border-color 0.25s ease;
+    background: transparent;
+    position: relative;
+    z-index: 1;
   }
   input#noteInput:focus {
     outline: none;
@@ -145,6 +163,24 @@
     font-size: 0.75rem;
     font-weight: 600;
   }
+  .fields {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin-top: 0.5rem;
+    font-size: 0.85rem;
+  }
+  .field {
+    background: #e8f4f8;
+    color: #2c3e50;
+    padding: 0.2rem 0.6rem;
+    border-radius: 4px;
+    border: 1px solid #b8d4e0;
+  }
+  .field-key {
+    font-weight: 600;
+    color: #34495e;
+  }
   .timestamp {
     font-size: 0.7rem;
     color: #999;
@@ -184,6 +220,12 @@
   .modal-content h3 {
     margin-top: 0;
     color: #4a90e2;
+  }
+  .modal-content label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 0.3rem;
+    color: #34495e;
   }
   .modal-content input,
   .modal-content textarea {
@@ -238,7 +280,10 @@
 <header>Smart Note-Taking App</header>
 <main>
   <form id="noteForm" autocomplete="off" aria-label="Add new note">
-    <input id="noteInput" type="text" placeholder='Type a note with tags: "book, sci-fi: Sapiens" or "restaurant, thai, downtown: My Favorite Place"' aria-describedby="noteHelp" />
+    <div class="input-wrapper">
+      <div class="autocomplete-ghost" id="autocompleteGhost"></div>
+      <input id="noteInput" type="text" placeholder='e.g. "book: Project Hail Mary, genre:sci-fi, Zach would love this"' aria-describedby="noteHelp" />
+    </div>
     <button type="submit" aria-label="Add note">Add</button>
   </form>
 
@@ -252,7 +297,8 @@
   </div>
 </main>
 <footer>
-  Add tags before the colon. Examples: <code>book: The Great Gatsby</code>, <code>restaurant, italian: La Trattoria</code>, <code>movie, action, watched: Inception - loved it!</code>
+  Format: <code>tags: Title, key:value, notes</code><br/>
+  Example: <code>restaurant, favorite: Five Guys, location:newton, cuisine:burgers, quick lunch</code>
 </footer>
 
 <!-- Edit Modal -->
@@ -260,11 +306,13 @@
   <div class="modal-content">
     <h3>Edit Note</h3>
     <label for="editTags">Tags (comma-separated):</label>
-    <input id="editTags" type="text" placeholder="book, sci-fi, favorite" />
+    <input id="editTags" type="text" placeholder="book, favorite" />
     <label for="editTitle">Title:</label>
     <input id="editTitle" type="text" placeholder="Note title" />
-    <label for="editDetails">Details:</label>
-    <textarea id="editDetails" placeholder="Additional details"></textarea>
+    <label for="editFields">Fields (key:value pairs, comma-separated):</label>
+    <input id="editFields" type="text" placeholder="genre:sci-fi, rating:5" />
+    <label for="editNotes">Notes:</label>
+    <textarea id="editNotes" placeholder="Additional notes"></textarea>
     <div class="modal-actions">
       <button class="cancel-btn" id="cancelEdit">Cancel</button>
       <button id="saveEdit">Save</button>
@@ -276,22 +324,26 @@
   (() => {
     const noteForm = document.getElementById("noteForm");
     const noteInput = document.getElementById("noteInput");
+    const autocompleteGhost = document.getElementById("autocompleteGhost");
     const searchInput = document.getElementById("searchInput");
     const notesList = document.getElementById("notesList");
     const editModal = document.getElementById("editModal");
     const editTags = document.getElementById("editTags");
     const editTitle = document.getElementById("editTitle");
-    const editDetails = document.getElementById("editDetails");
+    const editFields = document.getElementById("editFields");
+    const editNotes = document.getElementById("editNotes");
     const saveEditBtn = document.getElementById("saveEdit");
     const cancelEditBtn = document.getElementById("cancelEdit");
 
     // Storage keys
     const STORAGE_KEY = "smartNotesAppData";
+    const AUTOCOMPLETE_KEY = "smartNotesAutocomplete";
 
     // Load notes from localStorage
     let notesData = [];
     let currentEditIndex = -1;
     let searchQuery = "";
+    let autocompleteData = { keys: {}, values: {} }; // Track field keys and their values
 
     function loadNotes() {
       const saved = localStorage.getItem(STORAGE_KEY);
@@ -306,8 +358,9 @@
               parsed.books.forEach(note => {
                 notesData.push({
                   tags: ['book'],
+                  fields: {},
                   title: note.title || '',
-                  details: note.details || '',
+                  notes: note.details || '',
                   raw: note.raw || '',
                   timestamp: Date.now()
                 });
@@ -317,8 +370,9 @@
               parsed.restaurants.forEach(note => {
                 notesData.push({
                   tags: ['restaurant'],
+                  fields: {},
                   title: note.title || '',
-                  details: note.details || '',
+                  notes: note.details || '',
                   raw: note.raw || '',
                   timestamp: Date.now()
                 });
@@ -328,8 +382,9 @@
               parsed.projects.forEach(note => {
                 notesData.push({
                   tags: ['other'],
+                  fields: {},
                   title: note.title || '',
-                  details: note.details || '',
+                  notes: note.details || '',
                   raw: note.raw || '',
                   timestamp: Date.now()
                 });
@@ -337,14 +392,59 @@
             }
             saveNotes(); // Save migrated data
           } else if (Array.isArray(parsed)) {
-            // New format
-            notesData = parsed;
+            // Handle migration from previous version without fields
+            notesData = parsed.map(note => ({
+              ...note,
+              fields: note.fields || {},
+              notes: note.notes || note.details || ''
+            }));
           }
         } catch (e) {
           // corrupted or invalid data, ignore
           localStorage.removeItem(STORAGE_KEY);
         }
       }
+    }
+
+    function loadAutocompleteData() {
+      const saved = localStorage.getItem(AUTOCOMPLETE_KEY);
+      if (saved) {
+        try {
+          autocompleteData = JSON.parse(saved);
+        } catch (e) {
+          autocompleteData = { keys: {}, values: {} };
+        }
+      }
+      // Build autocomplete data from existing notes
+      rebuildAutocompleteData();
+    }
+
+    function rebuildAutocompleteData() {
+      notesData.forEach(note => {
+        if (note.fields) {
+          Object.entries(note.fields).forEach(([key, value]) => {
+            // Track the key
+            if (!autocompleteData.keys[key]) {
+              autocompleteData.keys[key] = 0;
+            }
+            autocompleteData.keys[key]++;
+
+            // Track key:value combinations
+            if (!autocompleteData.values[key]) {
+              autocompleteData.values[key] = {};
+            }
+            if (!autocompleteData.values[key][value]) {
+              autocompleteData.values[key][value] = 0;
+            }
+            autocompleteData.values[key][value]++;
+          });
+        }
+      });
+      saveAutocompleteData();
+    }
+
+    function saveAutocompleteData() {
+      localStorage.setItem(AUTOCOMPLETE_KEY, JSON.stringify(autocompleteData));
     }
 
     // Save notes to localStorage
@@ -394,14 +494,27 @@
         contentDiv.appendChild(titleEl);
       }
 
-      if (note.details) {
-        const detailsEl = document.createElement("small");
-        detailsEl.textContent = note.details;
-        contentDiv.appendChild(detailsEl);
+      if (note.notes) {
+        const notesEl = document.createElement("small");
+        notesEl.textContent = note.notes;
+        contentDiv.appendChild(notesEl);
       }
 
-      if (!note.title && !note.details && note.raw) {
+      if (!note.title && !note.notes && note.raw) {
         contentDiv.textContent = note.raw;
+      }
+
+      // Add structured fields
+      if (note.fields && Object.keys(note.fields).length > 0) {
+        const fieldsDiv = document.createElement("div");
+        fieldsDiv.className = "fields";
+        Object.entries(note.fields).forEach(([key, value]) => {
+          const fieldSpan = document.createElement("span");
+          fieldSpan.className = "field";
+          fieldSpan.innerHTML = `<span class="field-key">${escapeHTML(key)}:</span> ${escapeHTML(value)}`;
+          fieldsDiv.appendChild(fieldSpan);
+        });
+        contentDiv.appendChild(fieldsDiv);
       }
 
       // Add tags
@@ -455,11 +568,14 @@
       const query = searchQuery.toLowerCase();
       return notesData.filter(note => {
         const titleMatch = note.title && note.title.toLowerCase().includes(query);
-        const detailsMatch = note.details && note.details.toLowerCase().includes(query);
+        const notesMatch = note.notes && note.notes.toLowerCase().includes(query);
         const rawMatch = note.raw && note.raw.toLowerCase().includes(query);
         const tagsMatch = note.tags && note.tags.some(tag => tag.toLowerCase().includes(query));
+        const fieldsMatch = note.fields && Object.entries(note.fields).some(([key, value]) =>
+          key.toLowerCase().includes(query) || value.toLowerCase().includes(query)
+        );
 
-        return titleMatch || detailsMatch || rawMatch || tagsMatch;
+        return titleMatch || notesMatch || rawMatch || tagsMatch || fieldsMatch;
       });
     }
 
@@ -481,12 +597,14 @@
       }
     }
 
-    // Parse input string for tags and content
-    // Format: "tag1, tag2: Title - Details"
-    // or just: "Some text" (defaults to 'note' tag)
+    // Parse input string for tags, fields, and content
+    // Format: "tag1, tag2: Title, key:value, key:value, free-form notes"
     function parseNoteInput(text) {
       const raw = text.trim();
       let tags = [];
+      let fields = {};
+      let title = "";
+      let notes = "";
       let content = raw;
 
       // Check if there's a colon separating tags from content
@@ -504,28 +622,130 @@
         tags = ['note'];
       }
 
-      // Try to split content into title and details
-      let title = "";
-      let details = "";
+      // Parse content: split by comma
+      const parts = content.split(',').map(p => p.trim()).filter(p => p.length > 0);
 
-      // Split on first dash, comma, or use entire content as title
-      const splitRegex = /[-–,]/;
-      const firstSepIndex = content.search(splitRegex);
+      if (parts.length > 0) {
+        // First part is always the title
+        title = parts[0];
 
-      if (firstSepIndex === -1) {
-        title = content;
-      } else {
-        title = content.slice(0, firstSepIndex).trim();
-        details = content.slice(firstSepIndex + 1).trim();
+        // Process remaining parts
+        let noteParts = [];
+        for (let i = 1; i < parts.length; i++) {
+          const part = parts[i];
+          const kvMatch = part.match(/^([a-zA-Z0-9_-]+)\s*:\s*(.+)$/);
+
+          if (kvMatch) {
+            // This is a key:value field
+            const key = kvMatch[1].toLowerCase();
+            const value = kvMatch[2].trim();
+            fields[key] = value;
+
+            // Track for autocomplete
+            if (!autocompleteData.keys[key]) {
+              autocompleteData.keys[key] = 0;
+            }
+            autocompleteData.keys[key]++;
+
+            if (!autocompleteData.values[key]) {
+              autocompleteData.values[key] = {};
+            }
+            if (!autocompleteData.values[key][value]) {
+              autocompleteData.values[key][value] = 0;
+            }
+            autocompleteData.values[key][value]++;
+          } else {
+            // This is either a tag or notes
+            noteParts.push(part);
+          }
+        }
+
+        // Combine all non-field parts as notes
+        if (noteParts.length > 0) {
+          notes = noteParts.join(', ');
+        }
       }
+
+      saveAutocompleteData();
 
       return {
         tags,
+        fields,
         title,
-        details,
+        notes,
         raw,
         timestamp: Date.now()
       };
+    }
+
+    // Autocomplete logic
+    function updateAutocomplete() {
+      const inputValue = noteInput.value;
+      const cursorPos = noteInput.selectionStart;
+
+      // Find the current segment (after last comma or start)
+      const beforeCursor = inputValue.substring(0, cursorPos);
+      const lastCommaIndex = beforeCursor.lastIndexOf(',');
+      const currentSegment = beforeCursor.substring(lastCommaIndex + 1).trim();
+
+      // Check if we're after the main colon
+      const mainColonIndex = inputValue.indexOf(':');
+      if (mainColonIndex === -1 || cursorPos <= mainColonIndex) {
+        autocompleteGhost.textContent = '';
+        return;
+      }
+
+      // Check if current segment looks like it could be a field (contains : or is typing one)
+      const kvMatch = currentSegment.match(/^([a-zA-Z0-9_-]*):?([a-zA-Z0-9_-]*)$/);
+      if (!kvMatch) {
+        autocompleteGhost.textContent = '';
+        return;
+      }
+
+      const [, key, value] = kvMatch;
+      const hasColon = currentSegment.includes(':');
+
+      let suggestion = '';
+
+      if (!hasColon && key) {
+        // Suggest key completion
+        const matchingKeys = Object.keys(autocompleteData.keys)
+          .filter(k => k.startsWith(key.toLowerCase()) && k !== key.toLowerCase())
+          .sort((a, b) => autocompleteData.keys[b] - autocompleteData.keys[a]);
+
+        if (matchingKeys.length > 0) {
+          suggestion = matchingKeys[0].substring(key.length) + ':';
+        }
+      } else if (hasColon && key && autocompleteData.values[key]) {
+        // Suggest value completion
+        const matchingValues = Object.keys(autocompleteData.values[key])
+          .filter(v => v.toLowerCase().startsWith(value.toLowerCase()) && v.toLowerCase() !== value.toLowerCase())
+          .sort((a, b) => autocompleteData.values[key][b] - autocompleteData.values[key][a]);
+
+        if (matchingValues.length > 0) {
+          suggestion = matchingValues[0].substring(value.length);
+        }
+      }
+
+      if (suggestion) {
+        // Calculate the ghost text position
+        const beforeText = inputValue.substring(0, cursorPos);
+        autocompleteGhost.textContent = beforeText + suggestion;
+      } else {
+        autocompleteGhost.textContent = '';
+      }
+    }
+
+    // Handle Tab key for autocomplete
+    function handleTab(e) {
+      const ghostText = autocompleteGhost.textContent;
+      if (ghostText) {
+        e.preventDefault();
+        const cursorPos = noteInput.selectionStart;
+        noteInput.value = ghostText + noteInput.value.substring(cursorPos);
+        noteInput.selectionStart = noteInput.selectionEnd = ghostText.length;
+        updateAutocomplete();
+      }
     }
 
     // Add note
@@ -542,7 +762,8 @@
 
       editTags.value = note.tags.join(', ');
       editTitle.value = note.title || '';
-      editDetails.value = note.details || '';
+      editFields.value = Object.entries(note.fields || {}).map(([k, v]) => `${k}:${v}`).join(', ');
+      editNotes.value = note.notes || '';
 
       editModal.classList.add('show');
       editTags.focus();
@@ -554,21 +775,42 @@
 
       const tags = editTags.value.split(',').map(t => t.trim().toLowerCase()).filter(t => t.length > 0);
       const title = editTitle.value.trim();
-      const details = editDetails.value.trim();
+      const notes = editNotes.value.trim();
+
+      // Parse fields
+      const fields = {};
+      const fieldParts = editFields.value.split(',').map(f => f.trim()).filter(f => f.length > 0);
+      fieldParts.forEach(part => {
+        const kvMatch = part.match(/^([a-zA-Z0-9_-]+)\s*:\s*(.+)$/);
+        if (kvMatch) {
+          fields[kvMatch[1].toLowerCase()] = kvMatch[2].trim();
+        }
+      });
 
       if (tags.length === 0) {
         tags.push('note');
       }
 
+      // Reconstruct raw text
+      let raw = tags.join(', ') + ': ' + title;
+      if (Object.keys(fields).length > 0) {
+        raw += ', ' + Object.entries(fields).map(([k, v]) => `${k}:${v}`).join(', ');
+      }
+      if (notes) {
+        raw += ', ' + notes;
+      }
+
       notesData[currentEditIndex] = {
         ...notesData[currentEditIndex],
         tags,
+        fields,
         title,
-        details,
-        raw: `${tags.join(', ')}: ${title}${details ? ' - ' + details : ''}`
+        notes,
+        raw
       };
 
       saveNotes();
+      rebuildAutocompleteData();
       renderNotes();
       closeEditModal();
     }
@@ -579,7 +821,8 @@
       currentEditIndex = -1;
       editTags.value = '';
       editTitle.value = '';
-      editDetails.value = '';
+      editFields.value = '';
+      editNotes.value = '';
     }
 
     // Delete note
@@ -601,7 +844,15 @@
       addNote(note);
 
       noteInput.value = "";
+      autocompleteGhost.textContent = "";
       noteInput.focus();
+    });
+
+    noteInput.addEventListener("input", updateAutocomplete);
+    noteInput.addEventListener("keydown", (e) => {
+      if (e.key === 'Tab') {
+        handleTab(e);
+      }
     });
 
     searchInput.addEventListener("input", (e) => {
@@ -621,6 +872,7 @@
 
     // Initialize app
     loadNotes();
+    loadAutocompleteData();
     renderNotes();
   })();
 </script>
