@@ -52,7 +52,8 @@
     margin-bottom: 1rem;
   }
   input#noteInput {
-    width: 100%;
+    flex: 1;
+    min-width: 0;
     font-size: 1rem;
     padding: 0.6rem 1rem;
     border-radius: 5px;
@@ -192,6 +193,11 @@
     border-bottom: 2px solid #e0e0e0;
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* IE and Edge */
+  }
+  .tabs::-webkit-scrollbar {
+    display: none; /* Chrome, Safari, Opera */
   }
   .tab {
     background: none;
