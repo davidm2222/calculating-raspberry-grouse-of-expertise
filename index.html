@@ -282,7 +282,7 @@
   <form id="noteForm" autocomplete="off" aria-label="Add new note">
     <div class="input-wrapper">
       <div class="autocomplete-ghost" id="autocompleteGhost"></div>
-      <input id="noteInput" type="text" placeholder='e.g. "book: Project Hail Mary, genre:sci-fi, Zach would love this"' aria-describedby="noteHelp" />
+      <input id="noteInput" type="text" placeholder='e.g. "book: Project Hail Mary, genre:sci-fi, Zach would love this" or "movie: Inception, genre:thriller, rating:5"' aria-describedby="noteHelp" />
     </div>
     <button type="submit" aria-label="Add note">Add</button>
   </form>
@@ -290,15 +290,32 @@
   <input id="searchInput" type="text" placeholder="Search notes..." aria-label="Search notes" />
 
   <div id="notesContainer" aria-live="polite">
-    <section class="notes-category">
-      <h2>All Notes</h2>
-      <ul class="note-list" id="notesList"></ul>
+    <section class="notes-category" id="booksSection">
+      <h2>Books</h2>
+      <ul class="note-list" id="booksList"></ul>
+    </section>
+    <section class="notes-category" id="moviesSection">
+      <h2>Movies</h2>
+      <ul class="note-list" id="moviesList"></ul>
+    </section>
+    <section class="notes-category" id="showsSection">
+      <h2>Shows</h2>
+      <ul class="note-list" id="showsList"></ul>
+    </section>
+    <section class="notes-category" id="restaurantsSection">
+      <h2>Restaurants</h2>
+      <ul class="note-list" id="restaurantsList"></ul>
+    </section>
+    <section class="notes-category" id="otherSection">
+      <h2>Other</h2>
+      <ul class="note-list" id="otherList"></ul>
     </section>
   </div>
 </main>
 <footer>
-  Format: <code>tags: Title, key:value, notes</code><br/>
-  Example: <code>restaurant, favorite: Five Guys, location:newton, cuisine:burgers, quick lunch</code>
+  Format: <code>category: Title, key:value, notes</code><br/>
+  Categories: <code>book</code>, <code>movie</code>, <code>show</code>, <code>restaurant</code><br/>
+  Example: <code>restaurant: Five Guys, location:newton, cuisine:burgers, quick lunch</code>
 </footer>
 
 <!-- Edit Modal -->
@@ -326,7 +343,11 @@
     const noteInput = document.getElementById("noteInput");
     const autocompleteGhost = document.getElementById("autocompleteGhost");
     const searchInput = document.getElementById("searchInput");
-    const notesList = document.getElementById("notesList");
+    const booksList = document.getElementById("booksList");
+    const moviesList = document.getElementById("moviesList");
+    const showsList = document.getElementById("showsList");
+    const restaurantsList = document.getElementById("restaurantsList");
+    const otherList = document.getElementById("otherList");
     const editModal = document.getElementById("editModal");
     const editTags = document.getElementById("editTags");
     const editTitle = document.getElementById("editTitle");
@@ -338,6 +359,15 @@
     // Storage keys
     const STORAGE_KEY = "smartNotesAppData";
     const AUTOCOMPLETE_KEY = "smartNotesAutocomplete";
+
+    // Define categories
+    const CATEGORIES = {
+      book: { name: 'Books', listEl: booksList, aliases: ['book', 'books'] },
+      movie: { name: 'Movies', listEl: moviesList, aliases: ['movie', 'movies', 'film', 'films'] },
+      show: { name: 'Shows', listEl: showsList, aliases: ['show', 'shows', 'tv', 'series'] },
+      restaurant: { name: 'Restaurants', listEl: restaurantsList, aliases: ['restaurant', 'restaurants'] },
+      other: { name: 'Other', listEl: otherList, aliases: [] }
+    };
 
     // Load notes from localStorage
     let notesData = [];
@@ -579,22 +609,68 @@
       });
     }
 
+    // Determine which category a note belongs to
+    function getCategoryForNote(note) {
+      if (!note.tags || note.tags.length === 0) return 'other';
+
+      // Check if any tag matches a category alias
+      for (const [categoryKey, category] of Object.entries(CATEGORIES)) {
+        if (categoryKey === 'other') continue; // Skip 'other', it's the default
+
+        for (const tag of note.tags) {
+          if (category.aliases.includes(tag.toLowerCase())) {
+            return categoryKey;
+          }
+        }
+      }
+
+      return 'other';
+    }
+
     // Render all notes
     function renderNotes() {
-      notesList.innerHTML = "";
+      // Clear all lists
+      booksList.innerHTML = "";
+      moviesList.innerHTML = "";
+      showsList.innerHTML = "";
+      restaurantsList.innerHTML = "";
+      otherList.innerHTML = "";
 
       const filteredNotes = filterNotes();
 
       if (filteredNotes.length === 0) {
         const message = searchQuery ? "No notes found matching your search." : "No notes yet. Start adding some!";
-        notesList.innerHTML = `<li><em>${message}</em></li>`;
-      } else {
-        filteredNotes.forEach((note, displayIndex) => {
-          // Find the original index in notesData
-          const originalIndex = notesData.indexOf(note);
-          notesList.appendChild(createListItem(note, originalIndex));
-        });
+        otherList.innerHTML = `<li><em>${message}</em></li>`;
+        return;
       }
+
+      // Group notes by category
+      const notesByCategory = {
+        book: [],
+        movie: [],
+        show: [],
+        restaurant: [],
+        other: []
+      };
+
+      filteredNotes.forEach(note => {
+        const category = getCategoryForNote(note);
+        notesByCategory[category].push(note);
+      });
+
+      // Render each category
+      Object.entries(notesByCategory).forEach(([categoryKey, notes]) => {
+        const category = CATEGORIES[categoryKey];
+
+        if (notes.length === 0) {
+          category.listEl.innerHTML = `<li><em>No ${category.name.toLowerCase()} yet.</em></li>`;
+        } else {
+          notes.forEach(note => {
+            const originalIndex = notesData.indexOf(note);
+            category.listEl.appendChild(createListItem(note, originalIndex));
+          });
+        }
+      });
     }
 
     // Parse input string for tags, fields, and content
