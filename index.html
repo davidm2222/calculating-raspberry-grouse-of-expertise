@@ -34,7 +34,7 @@
   form {
     display: flex;
     gap: 0.5rem;
-    margin-bottom: 1.5rem;
+    margin-bottom: 1rem;
   }
   input#noteInput {
     flex: 1;
@@ -45,6 +45,19 @@
     transition: border-color 0.25s ease;
   }
   input#noteInput:focus {
+    outline: none;
+    border-color: #4a90e2;
+  }
+  input#searchInput {
+    width: 100%;
+    font-size: 1rem;
+    padding: 0.6rem 1rem;
+    border-radius: 5px;
+    border: 2px solid #ccc;
+    transition: border-color 0.25s ease;
+    margin-bottom: 1.5rem;
+  }
+  input#searchInput:focus {
     outline: none;
     border-color: #4a90e2;
   }
@@ -60,6 +73,24 @@
   }
   button:hover {
     background: #3b78c1;
+  }
+  button.delete-btn {
+    background: #e74c3c;
+    padding: 0.3rem 0.6rem;
+    font-size: 0.85rem;
+    margin-left: 0.3rem;
+  }
+  button.delete-btn:hover {
+    background: #c0392b;
+  }
+  button.edit-btn {
+    background: #27ae60;
+    padding: 0.3rem 0.6rem;
+    font-size: 0.85rem;
+    margin-left: 0.3rem;
+  }
+  button.edit-btn:hover {
+    background: #229954;
   }
   section.notes-category {
     margin-bottom: 2.5rem;
@@ -81,6 +112,18 @@
     margin-bottom: 0.5rem;
     box-shadow: 0 1px 4px rgb(0 0 0 / 0.1);
     word-break: break-word;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+  }
+  ul.note-list li .note-content {
+    flex: 1;
+  }
+  ul.note-list li .note-actions {
+    display: flex;
+    gap: 0.2rem;
+    flex-shrink: 0;
+    margin-left: 0.5rem;
   }
   ul.note-list li small {
     display: block;
@@ -88,15 +131,105 @@
     font-size: 0.85rem;
     color: #666;
   }
+  .tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+    margin-top: 0.5rem;
+  }
+  .tag {
+    background: #4a90e2;
+    color: white;
+    padding: 0.2rem 0.6rem;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+  .timestamp {
+    font-size: 0.7rem;
+    color: #999;
+    margin-top: 0.3rem;
+  }
   footer {
     text-align: center;
     font-size: 0.9rem;
     padding: 1rem 0;
     color: #888;
   }
+
+  /* Modal styles */
+  .modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0,0,0,0.5);
+    align-items: center;
+    justify-content: center;
+  }
+  .modal.show {
+    display: flex;
+  }
+  .modal-content {
+    background-color: white;
+    padding: 2rem;
+    border-radius: 8px;
+    max-width: 500px;
+    width: 90%;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+  }
+  .modal-content h3 {
+    margin-top: 0;
+    color: #4a90e2;
+  }
+  .modal-content input,
+  .modal-content textarea {
+    width: 100%;
+    padding: 0.6rem;
+    border: 2px solid #ccc;
+    border-radius: 5px;
+    font-family: inherit;
+    font-size: 1rem;
+    margin-bottom: 1rem;
+    box-sizing: border-box;
+  }
+  .modal-content textarea {
+    resize: vertical;
+    min-height: 60px;
+  }
+  .modal-content input:focus,
+  .modal-content textarea:focus {
+    outline: none;
+    border-color: #4a90e2;
+  }
+  .modal-actions {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: flex-end;
+  }
+  .modal-actions button {
+    padding: 0.6rem 1.2rem;
+  }
+  .cancel-btn {
+    background: #95a5a6;
+  }
+  .cancel-btn:hover {
+    background: #7f8c8d;
+  }
+
   @media (max-width: 500px) {
     button {
       padding: 0 0.8rem;
+    }
+    ul.note-list li {
+      flex-direction: column;
+    }
+    ul.note-list li .note-actions {
+      margin-left: 0;
+      margin-top: 0.5rem;
     }
   }
 </style>
@@ -105,49 +238,108 @@
 <header>Smart Note-Taking App</header>
 <main>
   <form id="noteForm" autocomplete="off" aria-label="Add new note">
-    <input id="noteInput" type="text" placeholder='Type a new note (e.g. "Book: Sapiens by Yuval Harari", "Restaurant: Il Pastaio, Italian, Beverly Hills")' aria-describedby="noteHelp" />
+    <input id="noteInput" type="text" placeholder='Type a note with tags: "book, sci-fi: Sapiens" or "restaurant, thai, downtown: My Favorite Place"' aria-describedby="noteHelp" />
     <button type="submit" aria-label="Add note">Add</button>
   </form>
+
+  <input id="searchInput" type="text" placeholder="Search notes..." aria-label="Search notes" />
+
   <div id="notesContainer" aria-live="polite">
-    <section class="notes-category" id="booksSection" aria-label="Book notes">
-      <h2>Books</h2>
-      <ul class="note-list" id="booksList"></ul>
-    </section>
-    <section class="notes-category" id="restaurantsSection" aria-label="Restaurant notes">
-      <h2>Restaurants</h2>
-      <ul class="note-list" id="restaurantsList"></ul>
-    </section>
-    <section class="notes-category" id="projectsSection" aria-label="Project notes">
-      <h2>Projects & Other Notes</h2>
-      <ul class="note-list" id="projectsList"></ul>
+    <section class="notes-category">
+      <h2>All Notes</h2>
+      <ul class="note-list" id="notesList"></ul>
     </section>
   </div>
 </main>
 <footer>
-  Type notes starting with <code>Book:</code>, <code>Restaurant:</code>, or any other text will go to Projects & Other Notes.<br />
-  Example: <em>Restaurant: Sushi Nakazawa, Japanese, NYC</em>
+  Add tags before the colon. Examples: <code>book: The Great Gatsby</code>, <code>restaurant, italian: La Trattoria</code>, <code>movie, action, watched: Inception - loved it!</code>
 </footer>
+
+<!-- Edit Modal -->
+<div id="editModal" class="modal">
+  <div class="modal-content">
+    <h3>Edit Note</h3>
+    <label for="editTags">Tags (comma-separated):</label>
+    <input id="editTags" type="text" placeholder="book, sci-fi, favorite" />
+    <label for="editTitle">Title:</label>
+    <input id="editTitle" type="text" placeholder="Note title" />
+    <label for="editDetails">Details:</label>
+    <textarea id="editDetails" placeholder="Additional details"></textarea>
+    <div class="modal-actions">
+      <button class="cancel-btn" id="cancelEdit">Cancel</button>
+      <button id="saveEdit">Save</button>
+    </div>
+  </div>
+</div>
+
 <script>
   (() => {
     const noteForm = document.getElementById("noteForm");
     const noteInput = document.getElementById("noteInput");
-    const booksList = document.getElementById("booksList");
-    const restaurantsList = document.getElementById("restaurantsList");
-    const projectsList = document.getElementById("projectsList");
+    const searchInput = document.getElementById("searchInput");
+    const notesList = document.getElementById("notesList");
+    const editModal = document.getElementById("editModal");
+    const editTags = document.getElementById("editTags");
+    const editTitle = document.getElementById("editTitle");
+    const editDetails = document.getElementById("editDetails");
+    const saveEditBtn = document.getElementById("saveEdit");
+    const cancelEditBtn = document.getElementById("cancelEdit");
 
     // Storage keys
     const STORAGE_KEY = "smartNotesAppData";
 
     // Load notes from localStorage
-    let notesData = { books: [], restaurants: [], projects: [] };
+    let notesData = [];
+    let currentEditIndex = -1;
+    let searchQuery = "";
+
     function loadNotes() {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
         try {
           const parsed = JSON.parse(saved);
-          if (parsed.books && Array.isArray(parsed.books)) notesData.books = parsed.books;
-          if (parsed.restaurants && Array.isArray(parsed.restaurants)) notesData.restaurants = parsed.restaurants;
-          if (parsed.projects && Array.isArray(parsed.projects)) notesData.projects = parsed.projects;
+          // Migration: convert old format to new format
+          if (parsed.books || parsed.restaurants || parsed.projects) {
+            // Old format - migrate to new format
+            notesData = [];
+            if (parsed.books) {
+              parsed.books.forEach(note => {
+                notesData.push({
+                  tags: ['book'],
+                  title: note.title || '',
+                  details: note.details || '',
+                  raw: note.raw || '',
+                  timestamp: Date.now()
+                });
+              });
+            }
+            if (parsed.restaurants) {
+              parsed.restaurants.forEach(note => {
+                notesData.push({
+                  tags: ['restaurant'],
+                  title: note.title || '',
+                  details: note.details || '',
+                  raw: note.raw || '',
+                  timestamp: Date.now()
+                });
+              });
+            }
+            if (parsed.projects) {
+              parsed.projects.forEach(note => {
+                notesData.push({
+                  tags: ['other'],
+                  title: note.title || '',
+                  details: note.details || '',
+                  raw: note.raw || '',
+                  timestamp: Date.now()
+                });
+              });
+            }
+            saveNotes(); // Save migrated data
+          } else if (Array.isArray(parsed)) {
+            // New format
+            notesData = parsed;
+          }
         } catch (e) {
           // corrupted or invalid data, ignore
           localStorage.removeItem(STORAGE_KEY);
@@ -173,124 +365,233 @@
       });
     }
 
+    // Format timestamp
+    function formatTimestamp(timestamp) {
+      const date = new Date(timestamp);
+      const now = new Date();
+      const diffMs = now - date;
+      const diffMins = Math.floor(diffMs / 60000);
+      const diffHours = Math.floor(diffMs / 3600000);
+      const diffDays = Math.floor(diffMs / 86400000);
+
+      if (diffMins < 1) return 'just now';
+      if (diffMins < 60) return `${diffMins}m ago`;
+      if (diffHours < 24) return `${diffHours}h ago`;
+      if (diffDays < 7) return `${diffDays}d ago`;
+      return date.toLocaleDateString();
+    }
+
     // Create list item element for a note
-    // Displays main title in bold and details below if present
-    function createListItem(note) {
+    function createListItem(note, index) {
       const li = document.createElement("li");
-      if (note.title && note.details) {
-        li.innerHTML = `<strong>${escapeHTML(note.title)}</strong><small>${escapeHTML(note.details)}</small>`;
-      } else {
-        li.textContent = escapeHTML(note.raw);
+
+      const contentDiv = document.createElement("div");
+      contentDiv.className = "note-content";
+
+      if (note.title) {
+        const titleEl = document.createElement("strong");
+        titleEl.textContent = note.title;
+        contentDiv.appendChild(titleEl);
       }
+
+      if (note.details) {
+        const detailsEl = document.createElement("small");
+        detailsEl.textContent = note.details;
+        contentDiv.appendChild(detailsEl);
+      }
+
+      if (!note.title && !note.details && note.raw) {
+        contentDiv.textContent = note.raw;
+      }
+
+      // Add tags
+      if (note.tags && note.tags.length > 0) {
+        const tagsDiv = document.createElement("div");
+        tagsDiv.className = "tags";
+        note.tags.forEach(tag => {
+          const tagSpan = document.createElement("span");
+          tagSpan.className = "tag";
+          tagSpan.textContent = tag;
+          tagsDiv.appendChild(tagSpan);
+        });
+        contentDiv.appendChild(tagsDiv);
+      }
+
+      // Add timestamp
+      if (note.timestamp) {
+        const timestampDiv = document.createElement("div");
+        timestampDiv.className = "timestamp";
+        timestampDiv.textContent = formatTimestamp(note.timestamp);
+        contentDiv.appendChild(timestampDiv);
+      }
+
+      li.appendChild(contentDiv);
+
+      // Add action buttons
+      const actionsDiv = document.createElement("div");
+      actionsDiv.className = "note-actions";
+
+      const editBtn = document.createElement("button");
+      editBtn.className = "edit-btn";
+      editBtn.textContent = "Edit";
+      editBtn.onclick = () => editNote(index);
+
+      const deleteBtn = document.createElement("button");
+      deleteBtn.className = "delete-btn";
+      deleteBtn.textContent = "Delete";
+      deleteBtn.onclick = () => deleteNote(index);
+
+      actionsDiv.appendChild(editBtn);
+      actionsDiv.appendChild(deleteBtn);
+      li.appendChild(actionsDiv);
+
       return li;
     }
 
-    // Render all lists
+    // Filter notes based on search query
+    function filterNotes() {
+      if (!searchQuery) return notesData;
+
+      const query = searchQuery.toLowerCase();
+      return notesData.filter(note => {
+        const titleMatch = note.title && note.title.toLowerCase().includes(query);
+        const detailsMatch = note.details && note.details.toLowerCase().includes(query);
+        const rawMatch = note.raw && note.raw.toLowerCase().includes(query);
+        const tagsMatch = note.tags && note.tags.some(tag => tag.toLowerCase().includes(query));
+
+        return titleMatch || detailsMatch || rawMatch || tagsMatch;
+      });
+    }
+
+    // Render all notes
     function renderNotes() {
-      booksList.innerHTML = "";
-      restaurantsList.innerHTML = "";
-      projectsList.innerHTML = "";
+      notesList.innerHTML = "";
 
-      if (notesData.books.length === 0) {
-        booksList.innerHTML = "<li><em>No book notes yet.</em></li>";
-      } else {
-        notesData.books.forEach((note) => {
-          booksList.appendChild(createListItem(note));
-        });
-      }
+      const filteredNotes = filterNotes();
 
-      if (notesData.restaurants.length === 0) {
-        restaurantsList.innerHTML = "<li><em>No restaurant notes yet.</em></li>";
+      if (filteredNotes.length === 0) {
+        const message = searchQuery ? "No notes found matching your search." : "No notes yet. Start adding some!";
+        notesList.innerHTML = `<li><em>${message}</em></li>`;
       } else {
-        notesData.restaurants.forEach((note) => {
-          restaurantsList.appendChild(createListItem(note));
-        });
-      }
-
-      if (notesData.projects.length === 0) {
-        projectsList.innerHTML = "<li><em>No project or general notes yet.</em></li>";
-      } else {
-        notesData.projects.forEach((note) => {
-          projectsList.appendChild(createListItem(note));
+        filteredNotes.forEach((note, displayIndex) => {
+          // Find the original index in notesData
+          const originalIndex = notesData.indexOf(note);
+          notesList.appendChild(createListItem(note, originalIndex));
         });
       }
     }
 
-    // Parse input string for note type and details
-    // It expects format: "Type: Info, more info, ..."
-    // Returns an object { category, title, details, raw }
-    // Categories: 'books', 'restaurants', 'projects' (default)
+    // Parse input string for tags and content
+    // Format: "tag1, tag2: Title - Details"
+    // or just: "Some text" (defaults to 'note' tag)
     function parseNoteInput(text) {
       const raw = text.trim();
-      // Detect type prefix (case-insensitive)
-      // The pattern: "Type: content"
-      const typeMatch = raw.match(/^([a-zA-Z]+)\s*:\s*(.+)$/);
-      if (!typeMatch) {
-        // No prefix, default to projects
-        return {
-          category: "projects",
-          raw,
-          title: "",
-          details: raw,
-        };
+      let tags = [];
+      let content = raw;
+
+      // Check if there's a colon separating tags from content
+      const colonIndex = raw.indexOf(':');
+      if (colonIndex > 0) {
+        const tagsPart = raw.substring(0, colonIndex).trim();
+        content = raw.substring(colonIndex + 1).trim();
+
+        // Split tags by comma
+        tags = tagsPart.split(',').map(t => t.trim().toLowerCase()).filter(t => t.length > 0);
       }
-      const prefix = typeMatch[1].toLowerCase();
-      const content = typeMatch[2].trim();
 
-      // Heuristic split for title vs details:
-      // For books: first comma or '-' separates title from author or notes
-      // For restaurants: first comma or '-' separates name from style/location
-      // For other types, just keep all content as details
+      // If no tags specified, add default 'note' tag
+      if (tags.length === 0) {
+        tags = ['note'];
+      }
 
-      let category;
-      if (prefix === "book" || prefix === "books") category = "books";
-      else if (prefix === "restaurant" || prefix === "restaurants") category = "restaurants";
-      else category = "projects";
-
+      // Try to split content into title and details
       let title = "";
       let details = "";
 
-      // Split on first comma or dash if any
-      // Trim spaces
-      const splitRegex = /[,–-]/; // includes dash and en dash (–)
+      // Split on first dash, comma, or use entire content as title
+      const splitRegex = /[-–,]/;
       const firstSepIndex = content.search(splitRegex);
+
       if (firstSepIndex === -1) {
-        // No separator found - all is title for books/restaurants, or details for projects
-        if (category === "books" || category === "restaurants") {
-          title = content;
-          details = "";
-        } else {
-          title = "";
-          details = content;
-        }
+        title = content;
       } else {
         title = content.slice(0, firstSepIndex).trim();
         details = content.slice(firstSepIndex + 1).trim();
       }
 
-      // Return the parsed note object with original raw too
       return {
-        category,
-        raw,
+        tags,
         title,
         details,
+        raw,
+        timestamp: Date.now()
       };
     }
 
-    // Add note to appropriate category list and save & render
+    // Add note
     function addNote(note) {
-      if (note.category === "books") {
-        notesData.books.unshift(note);
-      } else if (note.category === "restaurants") {
-        notesData.restaurants.unshift(note);
-      } else {
-        notesData.projects.unshift(note);
-      }
+      notesData.unshift(note);
       saveNotes();
       renderNotes();
     }
 
-    // On form submit
+    // Edit note
+    function editNote(index) {
+      currentEditIndex = index;
+      const note = notesData[index];
+
+      editTags.value = note.tags.join(', ');
+      editTitle.value = note.title || '';
+      editDetails.value = note.details || '';
+
+      editModal.classList.add('show');
+      editTags.focus();
+    }
+
+    // Save edited note
+    function saveEdit() {
+      if (currentEditIndex < 0 || currentEditIndex >= notesData.length) return;
+
+      const tags = editTags.value.split(',').map(t => t.trim().toLowerCase()).filter(t => t.length > 0);
+      const title = editTitle.value.trim();
+      const details = editDetails.value.trim();
+
+      if (tags.length === 0) {
+        tags.push('note');
+      }
+
+      notesData[currentEditIndex] = {
+        ...notesData[currentEditIndex],
+        tags,
+        title,
+        details,
+        raw: `${tags.join(', ')}: ${title}${details ? ' - ' + details : ''}`
+      };
+
+      saveNotes();
+      renderNotes();
+      closeEditModal();
+    }
+
+    // Close edit modal
+    function closeEditModal() {
+      editModal.classList.remove('show');
+      currentEditIndex = -1;
+      editTags.value = '';
+      editTitle.value = '';
+      editDetails.value = '';
+    }
+
+    // Delete note
+    function deleteNote(index) {
+      if (confirm('Are you sure you want to delete this note?')) {
+        notesData.splice(index, 1);
+        saveNotes();
+        renderNotes();
+      }
+    }
+
+    // Event listeners
     noteForm.addEventListener("submit", (e) => {
       e.preventDefault();
       const inputVal = noteInput.value.trim();
@@ -301,6 +602,21 @@
 
       noteInput.value = "";
       noteInput.focus();
+    });
+
+    searchInput.addEventListener("input", (e) => {
+      searchQuery = e.target.value.trim();
+      renderNotes();
+    });
+
+    saveEditBtn.addEventListener("click", saveEdit);
+    cancelEditBtn.addEventListener("click", closeEditModal);
+
+    // Close modal when clicking outside
+    editModal.addEventListener("click", (e) => {
+      if (e.target === editModal) {
+        closeEditModal();
+      }
     });
 
     // Initialize app
