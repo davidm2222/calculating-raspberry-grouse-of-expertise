@@ -34,6 +34,7 @@
   .input-wrapper {
     position: relative;
     flex: 1;
+    min-width: 0;
   }
   .autocomplete-ghost {
     position: absolute;
@@ -52,8 +53,7 @@
     margin-bottom: 1rem;
   }
   input#noteInput {
-    flex: 1;
-    min-width: 0;
+    width: 100%;
     font-size: 1rem;
     padding: 0.6rem 1rem;
     border-radius: 5px;
@@ -89,6 +89,7 @@
     padding: 0 1.2rem;
     cursor: pointer;
     transition: background-color 0.25s ease;
+    flex-shrink: 0;
   }
   button:hover {
     background: #3b78c1;
