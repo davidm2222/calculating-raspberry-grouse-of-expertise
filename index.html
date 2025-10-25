@@ -110,15 +110,6 @@
   button.edit-btn:hover {
     background: #229954;
   }
-  section.notes-category {
-    margin-bottom: 2.5rem;
-  }
-  section.notes-category h2 {
-    font-size: 1.4rem;
-    border-bottom: 2px solid #4a90e2;
-    padding-bottom: 0.3rem;
-    margin-bottom: 0.7rem;
-  }
   ul.note-list {
     list-style-type: none;
     padding-left: 0;
@@ -191,6 +182,50 @@
     font-size: 0.9rem;
     padding: 1rem 0;
     color: #888;
+  }
+
+  /* Tab styles */
+  .tabs {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1.5rem;
+    border-bottom: 2px solid #e0e0e0;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .tab {
+    background: none;
+    border: none;
+    padding: 0.75rem 1.25rem;
+    cursor: pointer;
+    font-size: 1rem;
+    font-weight: 600;
+    color: #666;
+    border-bottom: 3px solid transparent;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+    margin-bottom: -2px;
+  }
+  .tab:hover {
+    background: #f0f0f0;
+    color: #4a90e2;
+  }
+  .tab.active {
+    color: #4a90e2;
+    border-bottom-color: #4a90e2;
+    background: none;
+  }
+  section.notes-category {
+    display: none;
+  }
+  section.notes-category.active {
+    display: block;
+  }
+  section.notes-category h2 {
+    font-size: 1.4rem;
+    color: #4a90e2;
+    margin-bottom: 1rem;
+    margin-top: 0;
   }
 
   /* Modal styles */
@@ -289,24 +324,32 @@
 
   <input id="searchInput" type="text" placeholder="Search notes..." aria-label="Search notes" />
 
+  <div class="tabs" role="tablist">
+    <button class="tab active" data-category="book" role="tab" aria-selected="true">Books</button>
+    <button class="tab" data-category="movie" role="tab" aria-selected="false">Movies</button>
+    <button class="tab" data-category="show" role="tab" aria-selected="false">Shows</button>
+    <button class="tab" data-category="restaurant" role="tab" aria-selected="false">Restaurants</button>
+    <button class="tab" data-category="other" role="tab" aria-selected="false">Other</button>
+  </div>
+
   <div id="notesContainer" aria-live="polite">
-    <section class="notes-category" id="booksSection">
+    <section class="notes-category active" id="booksSection" role="tabpanel">
       <h2>Books</h2>
       <ul class="note-list" id="booksList"></ul>
     </section>
-    <section class="notes-category" id="moviesSection">
+    <section class="notes-category" id="moviesSection" role="tabpanel">
       <h2>Movies</h2>
       <ul class="note-list" id="moviesList"></ul>
     </section>
-    <section class="notes-category" id="showsSection">
+    <section class="notes-category" id="showsSection" role="tabpanel">
       <h2>Shows</h2>
       <ul class="note-list" id="showsList"></ul>
     </section>
-    <section class="notes-category" id="restaurantsSection">
+    <section class="notes-category" id="restaurantsSection" role="tabpanel">
       <h2>Restaurants</h2>
       <ul class="note-list" id="restaurantsList"></ul>
     </section>
-    <section class="notes-category" id="otherSection">
+    <section class="notes-category" id="otherSection" role="tabpanel">
       <h2>Other</h2>
       <ul class="note-list" id="otherList"></ul>
     </section>
@@ -359,14 +402,15 @@
     // Storage keys
     const STORAGE_KEY = "smartNotesAppData";
     const AUTOCOMPLETE_KEY = "smartNotesAutocomplete";
+    const ACTIVE_TAB_KEY = "smartNotesActiveTab";
 
     // Define categories
     const CATEGORIES = {
-      book: { name: 'Books', listEl: booksList, aliases: ['book', 'books'] },
-      movie: { name: 'Movies', listEl: moviesList, aliases: ['movie', 'movies', 'film', 'films'] },
-      show: { name: 'Shows', listEl: showsList, aliases: ['show', 'shows', 'tv', 'series'] },
-      restaurant: { name: 'Restaurants', listEl: restaurantsList, aliases: ['restaurant', 'restaurants'] },
-      other: { name: 'Other', listEl: otherList, aliases: [] }
+      book: { name: 'Books', listEl: booksList, sectionEl: document.getElementById('booksSection'), aliases: ['book', 'books'] },
+      movie: { name: 'Movies', listEl: moviesList, sectionEl: document.getElementById('moviesSection'), aliases: ['movie', 'movies', 'film', 'films'] },
+      show: { name: 'Shows', listEl: showsList, sectionEl: document.getElementById('showsSection'), aliases: ['show', 'shows', 'tv', 'series'] },
+      restaurant: { name: 'Restaurants', listEl: restaurantsList, sectionEl: document.getElementById('restaurantsSection'), aliases: ['restaurant', 'restaurants'] },
+      other: { name: 'Other', listEl: otherList, sectionEl: document.getElementById('otherSection'), aliases: [] }
     };
 
     // Load notes from localStorage
@@ -374,6 +418,7 @@
     let currentEditIndex = -1;
     let searchQuery = "";
     let autocompleteData = { keys: {}, values: {} }; // Track field keys and their values
+    let activeTab = 'book'; // Default to Books tab
 
     function loadNotes() {
       const saved = localStorage.getItem(STORAGE_KEY);
@@ -480,6 +525,38 @@
     // Save notes to localStorage
     function saveNotes() {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(notesData));
+    }
+
+    // Load active tab from localStorage
+    function loadActiveTab() {
+      const saved = localStorage.getItem(ACTIVE_TAB_KEY);
+      if (saved && CATEGORIES[saved]) {
+        activeTab = saved;
+      }
+    }
+
+    // Save active tab to localStorage
+    function saveActiveTab() {
+      localStorage.setItem(ACTIVE_TAB_KEY, activeTab);
+    }
+
+    // Switch to a specific tab
+    function switchTab(categoryKey) {
+      activeTab = categoryKey;
+      saveActiveTab();
+
+      // Update tab buttons
+      document.querySelectorAll('.tab').forEach(tab => {
+        const isActive = tab.dataset.category === categoryKey;
+        tab.classList.toggle('active', isActive);
+        tab.setAttribute('aria-selected', isActive);
+      });
+
+      // Update sections
+      Object.entries(CATEGORIES).forEach(([key, category]) => {
+        const isActive = key === categoryKey;
+        category.sectionEl.classList.toggle('active', isActive);
+      });
     }
 
     // Sanitize and escape HTML for display
@@ -828,6 +905,11 @@
     function addNote(note) {
       notesData.unshift(note);
       saveNotes();
+
+      // Switch to the tab where this note belongs
+      const category = getCategoryForNote(note);
+      switchTab(category);
+
       renderNotes();
     }
 
@@ -946,9 +1028,18 @@
       }
     });
 
+    // Tab click event listeners
+    document.querySelectorAll('.tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        switchTab(tab.dataset.category);
+      });
+    });
+
     // Initialize app
     loadNotes();
     loadAutocompleteData();
+    loadActiveTab();
+    switchTab(activeTab); // Set the active tab
     renderNotes();
   })();
 </script>
