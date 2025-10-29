@@ -294,30 +294,17 @@
       contentDiv.appendChild(fieldsDiv);
     }
 
-    // Add resource type badge (only in "All Results" view) and hashtags
-    if ((showCategoryBadge && note.tags && note.tags.length > 0) || (note.hashTags && note.hashTags.length > 0)) {
+    // Add hashtags (resource type is already shown in title)
+    if (note.hashTags && note.hashTags.length > 0) {
       const tagsDiv = document.createElement("div");
       tagsDiv.className = "tags";
 
-      // Add resource type badge ONLY when showCategoryBadge is true (All Results view)
-      if (showCategoryBadge && note.tags && note.tags.length > 0) {
-        const categoryKey = getCategoryForNote(note);
-        const categoryName = CATEGORIES[categoryKey]?.name || 'Other';
-        const resourceBadge = document.createElement("span");
-        resourceBadge.className = "resource-type-badge";
-        resourceBadge.textContent = categoryName.toUpperCase();
-        tagsDiv.appendChild(resourceBadge);
-      }
-
-      // Add hashtags
-      if (note.hashTags && note.hashTags.length > 0) {
-        note.hashTags.forEach(hashTag => {
-          const tagSpan = document.createElement("span");
-          tagSpan.className = "tag";
-          tagSpan.textContent = '#' + hashTag;
-          tagsDiv.appendChild(tagSpan);
-        });
-      }
+      note.hashTags.forEach(hashTag => {
+        const tagSpan = document.createElement("span");
+        tagSpan.className = "tag";
+        tagSpan.textContent = '#' + hashTag;
+        tagsDiv.appendChild(tagSpan);
+      });
 
       contentDiv.appendChild(tagsDiv);
     }
