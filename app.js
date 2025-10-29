@@ -5,6 +5,8 @@
   const searchInput = document.getElementById("searchInput");
   const viewToggle = document.getElementById("viewToggle");
   const notesContainer = document.getElementById("notesContainer");
+  const allList = document.getElementById("allList");
+  const allTab = document.getElementById("allTab");
   const booksList = document.getElementById("booksList");
   const moviesList = document.getElementById("moviesList");
   const showsList = document.getElementById("showsList");
@@ -14,6 +16,7 @@
   const editTags = document.getElementById("editTags");
   const editTitle = document.getElementById("editTitle");
   const editFields = document.getElementById("editFields");
+  const editHashTags = document.getElementById("editHashTags");
   const editNotes = document.getElementById("editNotes");
   const saveEditBtn = document.getElementById("saveEdit");
   const cancelEditBtn = document.getElementById("cancelEdit");
@@ -26,6 +29,7 @@
 
   // Define categories
   const CATEGORIES = {
+    all: { name: 'All Results', listEl: allList, sectionEl: document.getElementById('allSection'), aliases: [] },
     book: { name: 'Books', listEl: booksList, sectionEl: document.getElementById('booksSection'), aliases: ['book', 'books'] },
     movie: { name: 'Movies', listEl: moviesList, sectionEl: document.getElementById('moviesSection'), aliases: ['movie', 'movies', 'film', 'films'] },
     show: { name: 'Shows', listEl: showsList, sectionEl: document.getElementById('showsSection'), aliases: ['show', 'shows', 'tv', 'series'] },
@@ -88,10 +92,11 @@
           }
           saveNotes(); // Save migrated data
         } else if (Array.isArray(parsed)) {
-          // Handle migration from previous version without fields
+          // Handle migration from previous version without fields/hashTags
           notesData = parsed.map(note => ({
             ...note,
             fields: note.fields || {},
+            hashTags: note.hashTags || [],
             notes: note.notes || note.details || ''
           }));
         }
@@ -151,7 +156,8 @@
   // Load active tab from localStorage
   function loadActiveTab() {
     const saved = localStorage.getItem(ACTIVE_TAB_KEY);
-    if (saved && CATEGORIES[saved]) {
+    // Don't restore 'all' tab on page load (it's search-only)
+    if (saved && CATEGORIES[saved] && saved !== 'all') {
       activeTab = saved;
     }
   }
@@ -241,7 +247,7 @@
   }
 
   // Create list item element for a note
-  function createListItem(note, index) {
+  function createListItem(note, index, showCategoryBadge = false) {
     const li = document.createElement("li");
 
     const contentDiv = document.createElement("div");
@@ -249,7 +255,19 @@
 
     if (note.title) {
       const titleEl = document.createElement("strong");
-      titleEl.textContent = note.title;
+
+      // Add category badge if requested (for "All Results" view)
+      if (showCategoryBadge) {
+        const categoryKey = getCategoryForNote(note);
+        const categoryName = CATEGORIES[categoryKey]?.name || 'Other';
+        const badge = document.createElement("span");
+        badge.className = "category-badge";
+        badge.textContent = categoryName.toUpperCase();
+        titleEl.appendChild(badge);
+      }
+
+      const titleText = document.createTextNode(note.title);
+      titleEl.appendChild(titleText);
       contentDiv.appendChild(titleEl);
     }
 
@@ -276,16 +294,31 @@
       contentDiv.appendChild(fieldsDiv);
     }
 
-    // Add tags
-    if (note.tags && note.tags.length > 0) {
+    // Add resource type badge (only in "All Results" view) and hashtags
+    if ((showCategoryBadge && note.tags && note.tags.length > 0) || (note.hashTags && note.hashTags.length > 0)) {
       const tagsDiv = document.createElement("div");
       tagsDiv.className = "tags";
-      note.tags.forEach(tag => {
-        const tagSpan = document.createElement("span");
-        tagSpan.className = "tag";
-        tagSpan.textContent = tag;
-        tagsDiv.appendChild(tagSpan);
-      });
+
+      // Add resource type badge ONLY when showCategoryBadge is true (All Results view)
+      if (showCategoryBadge && note.tags && note.tags.length > 0) {
+        const categoryKey = getCategoryForNote(note);
+        const categoryName = CATEGORIES[categoryKey]?.name || 'Other';
+        const resourceBadge = document.createElement("span");
+        resourceBadge.className = "resource-type-badge";
+        resourceBadge.textContent = categoryName.toUpperCase();
+        tagsDiv.appendChild(resourceBadge);
+      }
+
+      // Add hashtags
+      if (note.hashTags && note.hashTags.length > 0) {
+        note.hashTags.forEach(hashTag => {
+          const tagSpan = document.createElement("span");
+          tagSpan.className = "tag";
+          tagSpan.textContent = '#' + hashTag;
+          tagsDiv.appendChild(tagSpan);
+        });
+      }
+
       contentDiv.appendChild(tagsDiv);
     }
 
@@ -330,11 +363,12 @@
       const notesMatch = note.notes && note.notes.toLowerCase().includes(query);
       const rawMatch = note.raw && note.raw.toLowerCase().includes(query);
       const tagsMatch = note.tags && note.tags.some(tag => tag.toLowerCase().includes(query));
+      const hashTagsMatch = note.hashTags && note.hashTags.some(hashTag => hashTag.toLowerCase().includes(query));
       const fieldsMatch = note.fields && Object.entries(note.fields).some(([key, value]) =>
         key.toLowerCase().includes(query) || value.toLowerCase().includes(query)
       );
 
-      return titleMatch || notesMatch || rawMatch || tagsMatch || fieldsMatch;
+      return titleMatch || notesMatch || rawMatch || tagsMatch || hashTagsMatch || fieldsMatch;
     });
   }
 
@@ -344,7 +378,7 @@
 
     // Check if any tag matches a category alias
     for (const [categoryKey, category] of Object.entries(CATEGORIES)) {
-      if (categoryKey === 'other') continue; // Skip 'other', it's the default
+      if (categoryKey === 'other' || categoryKey === 'all') continue; // Skip 'other' and 'all', 'other' is the default
 
       for (const tag of note.tags) {
         if (category.aliases.includes(tag.toLowerCase())) {
@@ -359,6 +393,7 @@
   // Render all notes
   function renderNotes() {
     // Clear all lists
+    allList.innerHTML = "";
     booksList.innerHTML = "";
     moviesList.innerHTML = "";
     showsList.innerHTML = "";
@@ -367,13 +402,41 @@
 
     const filteredNotes = filterNotes();
 
+    // Show/hide "All Results" tab based on search query
+    if (searchQuery) {
+      allTab.style.display = 'block';
+      // Auto-switch to "All Results" tab when searching
+      if (activeTab !== 'all') {
+        switchTab('all');
+      }
+    } else {
+      allTab.style.display = 'none';
+      // If we're on "All Results" tab and search is cleared, switch back to a valid tab
+      if (activeTab === 'all') {
+        switchTab('book');
+      }
+    }
+
     if (filteredNotes.length === 0) {
       const message = searchQuery ? "No notes found matching your search." : "No notes yet. Start adding some!";
-      otherList.innerHTML = `<li><em>${message}</em></li>`;
+
+      if (searchQuery) {
+        allList.innerHTML = `<li><em>${message}</em></li>`;
+      } else {
+        otherList.innerHTML = `<li><em>${message}</em></li>`;
+      }
       return;
     }
 
-    // Group notes by category
+    // If searching, populate "All Results" view
+    if (searchQuery) {
+      filteredNotes.forEach(note => {
+        const originalIndex = notesData.indexOf(note);
+        allList.appendChild(createListItem(note, originalIndex, true)); // true = show category badge
+      });
+    }
+
+    // Group notes by category for individual category tabs
     const notesByCategory = {
       book: [],
       movie: [],
@@ -403,28 +466,29 @@
   }
 
   // Parse input string for tags, fields, and content
-  // Format: "tag1, tag2: Title, key:value, key:value, free-form notes"
+  // Format: "category: Title, key:value, #hashtag, free-form notes"
   function parseNoteInput(text) {
     const raw = text.trim();
-    let tags = [];
+    let resourceTags = []; // Category tags (book, movie, etc.)
+    let hashTags = []; // Hashtags (#sports, #inspiring)
     let fields = {};
     let title = "";
     let notes = "";
     let content = raw;
 
-    // Check if there's a colon separating tags from content
+    // Check if there's a colon separating resource tags from content
     const colonIndex = raw.indexOf(':');
     if (colonIndex > 0) {
       const tagsPart = raw.substring(0, colonIndex).trim();
       content = raw.substring(colonIndex + 1).trim();
 
-      // Split tags by comma
-      tags = tagsPart.split(',').map(t => t.trim().toLowerCase()).filter(t => t.length > 0);
+      // Split resource tags by comma
+      resourceTags = tagsPart.split(',').map(t => t.trim().toLowerCase()).filter(t => t.length > 0);
     }
 
-    // If no tags specified, add default 'note' tag
-    if (tags.length === 0) {
-      tags = ['note'];
+    // If no resource tags specified, add default 'note' tag
+    if (resourceTags.length === 0) {
+      resourceTags = ['note'];
     }
 
     // Parse content: split by comma
@@ -438,8 +502,18 @@
       let noteParts = [];
       for (let i = 1; i < parts.length; i++) {
         const part = parts[i];
-        const kvMatch = part.match(/^([a-zA-Z0-9_-]+)\s*:\s*(.+)$/);
 
+        // Check if it's a hashtag
+        if (part.startsWith('#')) {
+          const hashTag = part.substring(1).trim().toLowerCase();
+          if (hashTag.length > 0) {
+            hashTags.push(hashTag);
+          }
+          continue;
+        }
+
+        // Check if it's a key:value field
+        const kvMatch = part.match(/^([a-zA-Z0-9_-]+)\s*:\s*(.+)$/);
         if (kvMatch) {
           // This is a key:value field
           const key = kvMatch[1].toLowerCase();
@@ -460,12 +534,12 @@
           }
           autocompleteData.values[key][value]++;
         } else {
-          // This is either a tag or notes
+          // This is free-form notes
           noteParts.push(part);
         }
       }
 
-      // Combine all non-field parts as notes
+      // Combine all non-field, non-hashtag parts as notes
       if (noteParts.length > 0) {
         notes = noteParts.join(', ');
       }
@@ -474,7 +548,8 @@
     saveAutocompleteData();
 
     return {
-      tags,
+      tags: resourceTags, // Resource type tags (for categorization)
+      hashTags: hashTags, // User-added hashtags
       fields,
       title,
       notes,
@@ -574,6 +649,7 @@
     editTags.value = note.tags.join(', ');
     editTitle.value = note.title || '';
     editFields.value = Object.entries(note.fields || {}).map(([k, v]) => `${k}:${v}`).join(', ');
+    editHashTags.value = (note.hashTags || []).join(', ');
     editNotes.value = note.notes || '';
 
     editModal.classList.add('show');
@@ -587,6 +663,7 @@
     const tags = editTags.value.split(',').map(t => t.trim().toLowerCase()).filter(t => t.length > 0);
     const title = editTitle.value.trim();
     const notes = editNotes.value.trim();
+    const hashTags = editHashTags.value.split(',').map(t => t.trim().toLowerCase()).filter(t => t.length > 0);
 
     // Parse fields
     const fields = {};
@@ -607,6 +684,9 @@
     if (Object.keys(fields).length > 0) {
       raw += ', ' + Object.entries(fields).map(([k, v]) => `${k}:${v}`).join(', ');
     }
+    if (hashTags.length > 0) {
+      raw += ', ' + hashTags.map(tag => `#${tag}`).join(', ');
+    }
     if (notes) {
       raw += ', ' + notes;
     }
@@ -614,6 +694,7 @@
     notesData[currentEditIndex] = {
       ...notesData[currentEditIndex],
       tags,
+      hashTags,
       fields,
       title,
       notes,
@@ -633,6 +714,7 @@
     editTags.value = '';
     editTitle.value = '';
     editFields.value = '';
+    editHashTags.value = '';
     editNotes.value = '';
   }
 

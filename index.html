@@ -12,7 +12,7 @@
   <form id="noteForm" autocomplete="off" aria-label="Add new note">
     <div class="input-wrapper">
       <div class="autocomplete-ghost" id="autocompleteGhost"></div>
-      <input id="noteInput" type="text" placeholder='Try: "book: The Martian, genre:sci-fi, amazing read!" or "movie: Inception, rating:5"' aria-describedby="noteHelp" />
+      <input id="noteInput" type="text" placeholder='Try: "book: The Martian, genre:sci-fi, #space, amazing read!" or "movie: Inception, rating:5, #mindblowing"' aria-describedby="noteHelp" />
     </div>
     <button type="submit" aria-label="Add note">
       <span>Add Note</span>
@@ -25,6 +25,7 @@
   </div>
 
   <div class="tabs" role="tablist">
+    <button class="tab" data-category="all" role="tab" aria-selected="false" id="allTab" style="display: none;">All Results</button>
     <button class="tab active" data-category="book" role="tab" aria-selected="true">Books</button>
     <button class="tab" data-category="movie" role="tab" aria-selected="false">Movies</button>
     <button class="tab" data-category="show" role="tab" aria-selected="false">Shows</button>
@@ -33,37 +34,37 @@
   </div>
 
   <div id="notesContainer" aria-live="polite">
+    <section class="notes-category" id="allSection" role="tabpanel">
+      <ul class="note-list" id="allList"></ul>
+    </section>
     <section class="notes-category active" id="booksSection" role="tabpanel">
-      <h2>Books</h2>
       <ul class="note-list" id="booksList"></ul>
     </section>
     <section class="notes-category" id="moviesSection" role="tabpanel">
-      <h2>Movies</h2>
       <ul class="note-list" id="moviesList"></ul>
     </section>
     <section class="notes-category" id="showsSection" role="tabpanel">
-      <h2>Shows</h2>
       <ul class="note-list" id="showsList"></ul>
     </section>
     <section class="notes-category" id="restaurantsSection" role="tabpanel">
-      <h2>Restaurants</h2>
       <ul class="note-list" id="restaurantsList"></ul>
     </section>
     <section class="notes-category" id="otherSection" role="tabpanel">
-      <h2>Other</h2>
       <ul class="note-list" id="otherList"></ul>
     </section>
   </div>
 </main>
 <footer>
   <div>
-    <strong>Quick Guide:</strong> Format: <code>category: Title, key:value, notes</code>
+    <strong>Format:</strong> <code>category: Title, key:value, #tag, notes</code>
   </div>
-  <div>
-    Categories: <code>book</code>, <code>movie</code>, <code>show</code>, <code>restaurant</code>
+  <div style="margin-top: 0.3rem;">
+    <strong>Categories:</strong> <code>book</code> <code>movie</code> <code>show</code> <code>restaurant</code> |
+    <strong>Fields:</strong> <code>genre:sci-fi</code> <code>rating:5</code> |
+    <strong>Tags:</strong> <code>#sports</code> <code>#inspiring</code>
   </div>
-  <div style="margin-top: 0.5rem; opacity: 0.8;">
-    Smart Notes - Organize your life beautifully
+  <div style="margin-top: 0.3rem; font-size: 0.8rem; opacity: 0.8;">
+    Example: <code>movie: The Blind Side, genre:drama, rating:4, #sports, #inspiring, great football story</code>
   </div>
 </footer>
 
@@ -71,12 +72,14 @@
 <div id="editModal" class="modal">
   <div class="modal-content">
     <h3>Edit Note</h3>
-    <label for="editTags">Tags (comma-separated):</label>
-    <input id="editTags" type="text" placeholder="book, favorite" />
+    <label for="editTags">Resource Type:</label>
+    <input id="editTags" type="text" placeholder="book, movie, show" />
     <label for="editTitle">Title:</label>
     <input id="editTitle" type="text" placeholder="Note title" />
     <label for="editFields">Fields (key:value pairs, comma-separated):</label>
     <input id="editFields" type="text" placeholder="genre:sci-fi, rating:5" />
+    <label for="editHashTags">Hashtags (comma-separated, without #):</label>
+    <input id="editHashTags" type="text" placeholder="sports, inspiring" />
     <label for="editNotes">Notes:</label>
     <textarea id="editNotes" placeholder="Additional notes"></textarea>
     <div class="modal-actions">
