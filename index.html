@@ -7,7 +7,28 @@
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-<header><h1>Smart Notes</h1></header>
+<header>
+  <h1>Smart Notes</h1>
+  <div id="authContainer">
+    <span id="userEmail" style="display: none;"></span>
+    <button id="logoutBtn" style="display: none;">Logout</button>
+  </div>
+</header>
+
+<!-- Auth Modal -->
+<div id="authModal" class="modal" style="display: block;">
+  <div class="modal-content">
+    <h3 id="authTitle">Sign In</h3>
+    <input id="authEmail" type="email" placeholder="Email" />
+    <input id="authPassword" type="password" placeholder="Password" />
+    <div style="color: red; font-size: 0.85rem; margin-top: 0.5rem;" id="authError"></div>
+    <div class="modal-actions">
+      <button id="authSubmit">Sign In</button>
+      <button class="cancel-btn" id="authToggle">Need an account? Sign Up</button>
+    </div>
+  </div>
+</div>
+
 <main>
   <form id="noteForm" autocomplete="off" aria-label="Add new note">
     <div class="input-wrapper">
@@ -93,6 +114,7 @@
   </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="app.js"></script>
 </body>
 </html>

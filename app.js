@@ -1,4 +1,12 @@
 (() => {
+  // Initialize Supabase
+  const SUPABASE_URL = 'https://yeeiagpqlkdfsawwoccr.supabase.co';
+  const SUPABASE_ANON_KEY = 'sb_publishable_wTY4fUgWkoo4kc8YIPAU1g_I78qdZdR';
+  const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  let currentUser = null;
+
+  // DOM elements
   const noteForm = document.getElementById("noteForm");
   const noteInput = document.getElementById("noteInput");
   const autocompleteGhost = document.getElementById("autocompleteGhost");
@@ -21,6 +29,17 @@
   const editNotes = document.getElementById("editNotes");
   const saveEditBtn = document.getElementById("saveEdit");
   const cancelEditBtn = document.getElementById("cancelEdit");
+
+  // Auth elements
+  const authModal = document.getElementById("authModal");
+  const authTitle = document.getElementById("authTitle");
+  const authEmail = document.getElementById("authEmail");
+  const authPassword = document.getElementById("authPassword");
+  const authSubmit = document.getElementById("authSubmit");
+  const authToggle = document.getElementById("authToggle");
+  const authError = document.getElementById("authError");
+  const userEmail = document.getElementById("userEmail");
+  const logoutBtn = document.getElementById("logoutBtn");
 
   // Storage keys
   const STORAGE_KEY = "smartNotesAppData";
@@ -47,65 +66,32 @@
   let activeTab = 'book'; // Default to Books tab
   let viewMode = 'comfort'; // 'compact' or 'comfort'
 
-  function loadNotes() {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        // Migration: convert old format to new format
-        if (parsed.books || parsed.restaurants || parsed.projects) {
-          // Old format - migrate to new format
-          notesData = [];
-          if (parsed.books) {
-            parsed.books.forEach(note => {
-              notesData.push({
-                tags: ['book'],
-                fields: {},
-                title: note.title || '',
-                notes: note.details || '',
-                raw: note.raw || '',
-                timestamp: Date.now()
-              });
-            });
-          }
-          if (parsed.restaurants) {
-            parsed.restaurants.forEach(note => {
-              notesData.push({
-                tags: ['restaurant'],
-                fields: {},
-                title: note.title || '',
-                notes: note.details || '',
-                raw: note.raw || '',
-                timestamp: Date.now()
-              });
-            });
-          }
-          if (parsed.projects) {
-            parsed.projects.forEach(note => {
-              notesData.push({
-                tags: ['other'],
-                fields: {},
-                title: note.title || '',
-                notes: note.details || '',
-                raw: note.raw || '',
-                timestamp: Date.now()
-              });
-            });
-          }
-          saveNotes(); // Save migrated data
-        } else if (Array.isArray(parsed)) {
-          // Handle migration from previous version without fields/hashTags
-          notesData = parsed.map(note => ({
-            ...note,
-            fields: note.fields || {},
-            hashTags: note.hashTags || [],
-            notes: note.notes || note.details || ''
-          }));
-        }
-      } catch (e) {
-        // corrupted or invalid data, ignore
-        localStorage.removeItem(STORAGE_KEY);
-      }
+  async function loadNotes() {
+    if (!currentUser) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('notes')
+        .select('*')
+        .eq('user_id', currentUser.id)
+        .order('timestamp', { ascending: false });
+
+      if (error) throw error;
+
+      notesData = data.map(row => ({
+        id: row.id,
+        tags: row.tags || [],
+        hashTags: row.hash_tags || [],
+        fields: row.fields || {},
+        title: row.title || '',
+        notes: row.notes || '',
+        raw: row.raw || '',
+        timestamp: row.timestamp
+      }));
+
+      renderNotes();
+    } catch (error) {
+      console.error('Error loading notes:', error);
     }
   }
 
@@ -150,9 +136,10 @@
     localStorage.setItem(AUTOCOMPLETE_KEY, JSON.stringify(autocompleteData));
   }
 
-  // Save notes to localStorage
+  // Save notes - no longer needed for individual operations
+  // Notes are saved directly to Supabase in addNote, saveEdit, deleteNote
   function saveNotes() {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(notesData));
+    // Deprecated - kept for compatibility
   }
 
   // Load active tab from localStorage
@@ -633,15 +620,48 @@
   }
 
   // Add note
-  function addNote(note) {
-    notesData.unshift(note);
-    saveNotes();
+  async function addNote(note) {
+    if (!currentUser) return;
 
-    // Switch to the tab where this note belongs
-    const category = getCategoryForNote(note);
-    switchTab(category);
+    try {
+      const { data, error } = await supabase
+        .from('notes')
+        .insert([{
+          user_id: currentUser.id,
+          tags: note.tags,
+          hash_tags: note.hashTags,
+          fields: note.fields,
+          title: note.title,
+          notes: note.notes,
+          raw: note.raw,
+          timestamp: note.timestamp
+        }])
+        .select()
+        .single();
 
-    renderNotes();
+      if (error) throw error;
+
+      // Add the new note with its ID to the local array
+      notesData.unshift({
+        id: data.id,
+        tags: data.tags,
+        hashTags: data.hash_tags,
+        fields: data.fields,
+        title: data.title,
+        notes: data.notes,
+        raw: data.raw,
+        timestamp: data.timestamp
+      });
+
+      // Switch to the tab where this note belongs
+      const category = getCategoryForNote(note);
+      switchTab(category);
+
+      renderNotes();
+    } catch (error) {
+      console.error('Error adding note:', error);
+      alert('Failed to save note. Please try again.');
+    }
   }
 
   // Edit note
@@ -660,8 +680,9 @@
   }
 
   // Save edited note
-  function saveEdit() {
+  async function saveEdit() {
     if (currentEditIndex < 0 || currentEditIndex >= notesData.length) return;
+    if (!currentUser) return;
 
     const tags = editTags.value.split(',').map(t => t.trim().toLowerCase()).filter(t => t.length > 0);
     const title = editTitle.value.trim();
@@ -694,20 +715,42 @@
       raw += ', ' + notes;
     }
 
-    notesData[currentEditIndex] = {
-      ...notesData[currentEditIndex],
-      tags,
-      hashTags,
-      fields,
-      title,
-      notes,
-      raw
-    };
+    const noteId = notesData[currentEditIndex].id;
 
-    saveNotes();
-    rebuildAutocompleteData();
-    renderNotes();
-    closeEditModal();
+    try {
+      const { error } = await supabase
+        .from('notes')
+        .update({
+          tags,
+          hash_tags: hashTags,
+          fields,
+          title,
+          notes,
+          raw
+        })
+        .eq('id', noteId)
+        .eq('user_id', currentUser.id);
+
+      if (error) throw error;
+
+      // Update local data
+      notesData[currentEditIndex] = {
+        ...notesData[currentEditIndex],
+        tags,
+        hashTags,
+        fields,
+        title,
+        notes,
+        raw
+      };
+
+      rebuildAutocompleteData();
+      renderNotes();
+      closeEditModal();
+    } catch (error) {
+      console.error('Error updating note:', error);
+      alert('Failed to update note. Please try again.');
+    }
   }
 
   // Close edit modal
@@ -722,11 +765,145 @@
   }
 
   // Delete note
-  function deleteNote(index) {
-    if (confirm('Are you sure you want to delete this note?')) {
+  async function deleteNote(index) {
+    if (!confirm('Are you sure you want to delete this note?')) return;
+    if (!currentUser) return;
+
+    const noteId = notesData[index].id;
+
+    try {
+      const { error } = await supabase
+        .from('notes')
+        .delete()
+        .eq('id', noteId)
+        .eq('user_id', currentUser.id);
+
+      if (error) throw error;
+
       notesData.splice(index, 1);
-      saveNotes();
       renderNotes();
+    } catch (error) {
+      console.error('Error deleting note:', error);
+      alert('Failed to delete note. Please try again.');
+    }
+  }
+
+  // Authentication functions
+  let isSignUp = false;
+
+  async function handleAuth(e) {
+    e.preventDefault();
+    authError.textContent = '';
+
+    const email = authEmail.value.trim();
+    const password = authPassword.value.trim();
+
+    if (!email || !password) {
+      authError.textContent = 'Please enter both email and password';
+      return;
+    }
+
+    try {
+      if (isSignUp) {
+        // Sign up
+        const { data, error } = await supabase.auth.signUp({
+          email,
+          password
+        });
+
+        if (error) throw error;
+
+        if (data.user) {
+          // Check if email confirmation is required
+          if (data.session) {
+            // No email confirmation required - user is logged in
+            currentUser = data.user;
+            authModal.style.display = 'none';
+            userEmail.textContent = currentUser.email;
+            userEmail.style.display = 'inline';
+            logoutBtn.style.display = 'inline';
+            await loadNotes();
+          } else {
+            // Email confirmation required
+            authError.style.color = 'green';
+            authError.textContent = 'Account created! Please check your email to verify your account, then sign in.';
+            setTimeout(() => {
+              toggleAuthMode();
+            }, 3000);
+          }
+        }
+      } else {
+        // Sign in
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email,
+          password
+        });
+
+        if (error) throw error;
+
+        currentUser = data.user;
+        authModal.style.display = 'none';
+        userEmail.textContent = currentUser.email;
+        userEmail.style.display = 'inline';
+        logoutBtn.style.display = 'inline';
+
+        // Load user's notes
+        await loadNotes();
+      }
+    } catch (error) {
+      console.error('Auth error:', error);
+      authError.style.color = 'red';
+      authError.textContent = error.message || 'Authentication failed';
+    }
+  }
+
+  function toggleAuthMode() {
+    isSignUp = !isSignUp;
+    authError.textContent = '';
+    authError.style.color = 'red';
+
+    if (isSignUp) {
+      authTitle.textContent = 'Sign Up';
+      authSubmit.textContent = 'Sign Up';
+      authToggle.textContent = 'Already have an account? Sign In';
+    } else {
+      authTitle.textContent = 'Sign In';
+      authSubmit.textContent = 'Sign In';
+      authToggle.textContent = 'Need an account? Sign Up';
+    }
+  }
+
+  async function handleLogout() {
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+
+      currentUser = null;
+      notesData = [];
+      authModal.style.display = 'block';
+      userEmail.style.display = 'none';
+      logoutBtn.style.display = 'none';
+      authEmail.value = '';
+      authPassword.value = '';
+      authError.textContent = '';
+      renderNotes();
+    } catch (error) {
+      console.error('Logout error:', error);
+      alert('Failed to log out');
+    }
+  }
+
+  // Check for existing session
+  async function checkSession() {
+    const { data: { session } } = await supabase.auth.getSession();
+
+    if (session) {
+      currentUser = session.user;
+      authModal.style.display = 'none';
+      userEmail.textContent = currentUser.email;
+      userEmail.style.display = 'inline';
+      logoutBtn.style.display = 'inline';
+      await loadNotes();
     }
   }
 
@@ -775,12 +952,23 @@
     });
   });
 
+  // Auth event listeners
+  authSubmit.addEventListener('click', handleAuth);
+  authToggle.addEventListener('click', toggleAuthMode);
+  logoutBtn.addEventListener('click', handleLogout);
+
+  // Close auth modal when clicking outside (but not during initial load)
+  authModal.addEventListener('click', (e) => {
+    if (e.target === authModal && currentUser) {
+      authModal.style.display = 'none';
+    }
+  });
+
   // Initialize app
-  loadNotes();
   loadAutocompleteData();
   loadActiveTab();
   loadViewMode();
   switchTab(activeTab); // Set the active tab
   updateViewMode(); // Set the view mode
-  renderNotes();
+  checkSession(); // Check for existing session and load notes if logged in
 })();
