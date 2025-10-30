@@ -30,6 +30,7 @@
     <button class="tab" data-category="movie" role="tab" aria-selected="false">Movies</button>
     <button class="tab" data-category="show" role="tab" aria-selected="false">Shows</button>
     <button class="tab" data-category="restaurant" role="tab" aria-selected="false">Restaurants</button>
+    <button class="tab" data-category="drink" role="tab" aria-selected="false">Drinks</button>
     <button class="tab" data-category="other" role="tab" aria-selected="false">Other</button>
   </div>
 
@@ -49,6 +50,9 @@
     <section class="notes-category" id="restaurantsSection" role="tabpanel">
       <ul class="note-list" id="restaurantsList"></ul>
     </section>
+    <section class="notes-category" id="drinksSection" role="tabpanel">
+      <ul class="note-list" id="drinksList"></ul>
+    </section>
     <section class="notes-category" id="otherSection" role="tabpanel">
       <ul class="note-list" id="otherList"></ul>
     </section>
@@ -59,12 +63,12 @@
     <strong>Format:</strong> <code>category: Title, key:value, #tag, notes</code>
   </div>
   <div style="margin-top: 0.3rem;">
-    <strong>Categories:</strong> <code>book</code> <code>movie</code> <code>show</code> <code>restaurant</code> |
-    <strong>Fields:</strong> <code>genre:sci-fi</code> <code>rating:5</code> |
-    <strong>Tags:</strong> <code>#sports</code> <code>#inspiring</code>
+    <strong>Categories:</strong> <code>book</code> <code>movie</code> <code>show</code> <code>restaurant</code> <code>drink</code> |
+    <strong>Fields:</strong> <code>genre:sci-fi</code> <code>rating:5</code> <code>brewery:treehouse</code> |
+    <strong>Tags:</strong> <code>#sports</code> <code>#inspiring</code> <code>#beer</code>
   </div>
   <div style="margin-top: 0.3rem; font-size: 0.8rem; opacity: 0.8;">
-    Example: <code>movie: The Blind Side, genre:drama, rating:4, #sports, #inspiring, great football story</code>
+    Example: <code>drink: Julius, brewery:treehouse, #beer, hazy and delicious</code>
   </div>
 </footer>
 

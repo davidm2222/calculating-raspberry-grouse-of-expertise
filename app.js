@@ -11,6 +11,7 @@
   const moviesList = document.getElementById("moviesList");
   const showsList = document.getElementById("showsList");
   const restaurantsList = document.getElementById("restaurantsList");
+  const drinksList = document.getElementById("drinksList");
   const otherList = document.getElementById("otherList");
   const editModal = document.getElementById("editModal");
   const editTags = document.getElementById("editTags");
@@ -34,6 +35,7 @@
     movie: { name: 'Movies', listEl: moviesList, sectionEl: document.getElementById('moviesSection'), aliases: ['movie', 'movies', 'film', 'films'] },
     show: { name: 'Shows', listEl: showsList, sectionEl: document.getElementById('showsSection'), aliases: ['show', 'shows', 'tv', 'series'] },
     restaurant: { name: 'Restaurants', listEl: restaurantsList, sectionEl: document.getElementById('restaurantsSection'), aliases: ['restaurant', 'restaurants'] },
+    drink: { name: 'Drinks', listEl: drinksList, sectionEl: document.getElementById('drinksSection'), aliases: ['drink', 'drinks', 'beer', 'wine', 'cocktail'] },
     other: { name: 'Other', listEl: otherList, sectionEl: document.getElementById('otherSection'), aliases: [] }
   };
 
@@ -385,6 +387,7 @@
     moviesList.innerHTML = "";
     showsList.innerHTML = "";
     restaurantsList.innerHTML = "";
+    drinksList.innerHTML = "";
     otherList.innerHTML = "";
 
     const filteredNotes = filterNotes();
@@ -429,6 +432,7 @@
       movie: [],
       show: [],
       restaurant: [],
+      drink: [],
       other: []
     };
 
@@ -477,6 +481,18 @@
     if (resourceTags.length === 0) {
       resourceTags = ['note'];
     }
+
+    // Auto-add hashtags for drink sub-types (beer, wine, cocktail)
+    // If someone types "beer: Heady Topper", automatically add #beer
+    const drinkSubTypes = ['beer', 'wine', 'cocktail'];
+    resourceTags.forEach(tag => {
+      if (drinkSubTypes.includes(tag)) {
+        // Add as hashtag if not already present
+        if (!hashTags.includes(tag)) {
+          hashTags.push(tag);
+        }
+      }
+    });
 
     // Parse content: split by comma
     const parts = content.split(',').map(p => p.trim()).filter(p => p.length > 0);
