@@ -43,13 +43,15 @@ header {
   backdrop-filter: blur(10px);
   color: var(--text-primary);
   padding: 0.75rem 1rem;
-  text-align: center;
   font-weight: 700;
   box-shadow: var(--shadow-md);
   position: sticky;
   top: 0;
   z-index: 100;
   border-bottom: 1px solid var(--border-color);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
 header h1 {
@@ -59,6 +61,34 @@ header h1 {
   -webkit-text-fill-color: transparent;
   background-clip: text;
   font-size: 1.4rem;
+}
+
+#authContainer {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.9rem;
+}
+
+#userEmail {
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+#logoutBtn {
+  background: var(--danger-color);
+  color: white;
+  border: none;
+  padding: 0.4rem 0.8rem;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 600;
+  transition: background 0.2s;
+}
+
+#logoutBtn:hover {
+  background: var(--danger-hover);
 }
 
 main {
