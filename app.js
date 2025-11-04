@@ -20,6 +20,7 @@
   const showsList = document.getElementById("showsList");
   const restaurantsList = document.getElementById("restaurantsList");
   const drinksList = document.getElementById("drinksList");
+  const activitiesList = document.getElementById("activitiesList");
   const otherList = document.getElementById("otherList");
   const editModal = document.getElementById("editModal");
   const editTags = document.getElementById("editTags");
@@ -55,6 +56,7 @@
     show: { name: 'Shows', listEl: showsList, sectionEl: document.getElementById('showsSection'), aliases: ['show', 'shows', 'tv', 'series'] },
     restaurant: { name: 'Restaurants', listEl: restaurantsList, sectionEl: document.getElementById('restaurantsSection'), aliases: ['restaurant', 'restaurants'] },
     drink: { name: 'Drinks', listEl: drinksList, sectionEl: document.getElementById('drinksSection'), aliases: ['drink', 'drinks', 'beer', 'wine', 'cocktail'] },
+    activity: { name: 'Activities', listEl: activitiesList, sectionEl: document.getElementById('activitiesSection'), aliases: ['activity', 'activities', 'hike', 'hiking', 'concert', 'museum', 'theater', 'gallery', 'event'] },
     other: { name: 'Other', listEl: otherList, sectionEl: document.getElementById('otherSection'), aliases: [] }
   };
 
@@ -65,6 +67,7 @@
   let autocompleteData = { keys: {}, values: {} }; // Track field keys and their values
   let activeTab = 'book'; // Default to Books tab
   let viewMode = 'comfort'; // 'compact' or 'comfort'
+  let activeFilters = {}; // Store active filter selections per category { categoryKey: { fieldKey: value } }
 
   async function loadNotes() {
     if (!currentUser) return;
@@ -333,19 +336,144 @@
   function filterNotes() {
     if (!searchQuery) return notesData;
 
-    const query = searchQuery.toLowerCase();
-    return notesData.filter(note => {
-      const titleMatch = note.title && note.title.toLowerCase().includes(query);
-      const notesMatch = note.notes && note.notes.toLowerCase().includes(query);
-      const rawMatch = note.raw && note.raw.toLowerCase().includes(query);
-      const tagsMatch = note.tags && note.tags.some(tag => tag.toLowerCase().includes(query));
-      const hashTagsMatch = note.hashTags && note.hashTags.some(hashTag => hashTag.toLowerCase().includes(query));
-      const fieldsMatch = note.fields && Object.entries(note.fields).some(([key, value]) =>
-        key.toLowerCase().includes(query) || value.toLowerCase().includes(query)
-      );
+    // Split search query into individual terms for OR logic
+    const terms = searchQuery.toLowerCase().split(/\s+/).filter(t => t.length > 0);
 
-      return titleMatch || notesMatch || rawMatch || tagsMatch || hashTagsMatch || fieldsMatch;
+    return notesData.filter(note => {
+      // Check if ANY search term matches ANY field in the note
+      return terms.some(term => {
+        const titleMatch = note.title && note.title.toLowerCase().includes(term);
+        const notesMatch = note.notes && note.notes.toLowerCase().includes(term);
+        const rawMatch = note.raw && note.raw.toLowerCase().includes(term);
+        const tagsMatch = note.tags && note.tags.some(tag => tag.toLowerCase().includes(term));
+        const hashTagsMatch = note.hashTags && note.hashTags.some(hashTag => hashTag.toLowerCase().includes(term));
+        const fieldsMatch = note.fields && Object.entries(note.fields).some(([key, value]) =>
+          key.toLowerCase().includes(term) || value.toLowerCase().includes(term)
+        );
+
+        return titleMatch || notesMatch || rawMatch || tagsMatch || hashTagsMatch || fieldsMatch;
+      });
     });
+  }
+
+  // Apply field filters to notes
+  function applyFieldFilters(notes, categoryKey) {
+    if (!activeFilters[categoryKey] || Object.keys(activeFilters[categoryKey]).length === 0) {
+      return notes;
+    }
+
+    return notes.filter(note => {
+      // Check if note matches ALL active filters for this category
+      return Object.entries(activeFilters[categoryKey]).every(([fieldKey, filterValue]) => {
+        if (!filterValue || filterValue === 'all') return true; // No filter or "All" selected
+        return note.fields && note.fields[fieldKey] && note.fields[fieldKey].toLowerCase() === filterValue.toLowerCase();
+      });
+    });
+  }
+
+  // Generate filter UI for a category
+  function generateCategoryFilters(categoryKey) {
+    if (categoryKey === 'all') return; // No filters for "All Results" view
+
+    const filterContainer = document.getElementById(`${categoryKey === 'book' ? 'books' : categoryKey === 'movie' ? 'movies' : categoryKey === 'show' ? 'shows' : categoryKey === 'restaurant' ? 'restaurants' : categoryKey === 'drink' ? 'drinks' : categoryKey === 'activity' ? 'activities' : 'other'}Filters`);
+    if (!filterContainer) return;
+
+    // Get all notes for this category
+    const categoryNotes = notesData.filter(note => getCategoryForNote(note) === categoryKey);
+
+    if (categoryNotes.length === 0) {
+      filterContainer.innerHTML = '';
+      return;
+    }
+
+    // Find all unique field keys used in this category
+    const fieldKeys = new Set();
+    categoryNotes.forEach(note => {
+      if (note.fields) {
+        Object.keys(note.fields).forEach(key => fieldKeys.add(key));
+      }
+    });
+
+    if (fieldKeys.size === 0) {
+      filterContainer.innerHTML = '';
+      return;
+    }
+
+    // Build filter UI
+    let filterHTML = '<div class="filters">';
+
+    fieldKeys.forEach(fieldKey => {
+      // Get all unique values for this field
+      const values = new Set();
+      categoryNotes.forEach(note => {
+        if (note.fields && note.fields[fieldKey]) {
+          values.add(note.fields[fieldKey]);
+        }
+      });
+
+      const sortedValues = Array.from(values).sort();
+      const currentValue = activeFilters[categoryKey]?.[fieldKey] || 'all';
+
+      filterHTML += `
+        <div class="filter-group">
+          <label>${fieldKey.charAt(0).toUpperCase() + fieldKey.slice(1)}:</label>
+          <select class="filter-select" data-category="${categoryKey}" data-field="${fieldKey}">
+            <option value="all" ${currentValue === 'all' ? 'selected' : ''}>All</option>
+            ${sortedValues.map(value => `
+              <option value="${escapeHTML(value)}" ${currentValue === value ? 'selected' : ''}>
+                ${escapeHTML(value)}
+              </option>
+            `).join('')}
+          </select>
+        </div>
+      `;
+    });
+
+    // Add clear filters button if any filters are active
+    const hasActiveFilters = activeFilters[categoryKey] && Object.values(activeFilters[categoryKey]).some(v => v && v !== 'all');
+    if (hasActiveFilters) {
+      filterHTML += '<button class="clear-filters-btn" data-category="' + categoryKey + '">Clear Filters</button>';
+    }
+
+    filterHTML += '</div>';
+    filterContainer.innerHTML = filterHTML;
+
+    // Add event listeners to filter selects
+    filterContainer.querySelectorAll('.filter-select').forEach(select => {
+      select.addEventListener('change', handleFilterChange);
+    });
+
+    // Add event listener to clear button
+    const clearBtn = filterContainer.querySelector('.clear-filters-btn');
+    if (clearBtn) {
+      clearBtn.addEventListener('click', handleClearFilters);
+    }
+  }
+
+  // Handle filter change
+  function handleFilterChange(e) {
+    const categoryKey = e.target.dataset.category;
+    const fieldKey = e.target.dataset.field;
+    const value = e.target.value;
+
+    if (!activeFilters[categoryKey]) {
+      activeFilters[categoryKey] = {};
+    }
+
+    if (value === 'all') {
+      delete activeFilters[categoryKey][fieldKey];
+    } else {
+      activeFilters[categoryKey][fieldKey] = value;
+    }
+
+    renderNotes();
+  }
+
+  // Handle clear all filters
+  function handleClearFilters(e) {
+    const categoryKey = e.target.dataset.category;
+    activeFilters[categoryKey] = {};
+    renderNotes();
   }
 
   // Determine which category a note belongs to
@@ -375,6 +503,7 @@
     showsList.innerHTML = "";
     restaurantsList.innerHTML = "";
     drinksList.innerHTML = "";
+    activitiesList.innerHTML = "";
     otherList.innerHTML = "";
 
     const filteredNotes = filterNotes();
@@ -420,6 +549,7 @@
       show: [],
       restaurant: [],
       drink: [],
+      activity: [],
       other: []
     };
 
@@ -432,10 +562,24 @@
     Object.entries(notesByCategory).forEach(([categoryKey, notes]) => {
       const category = CATEGORIES[categoryKey];
 
-      if (notes.length === 0) {
-        category.listEl.innerHTML = `<li><em>No ${category.name.toLowerCase()} yet.</em></li>`;
+      // Generate filter UI for this category (only if not searching)
+      if (!searchQuery) {
+        generateCategoryFilters(categoryKey);
+      }
+
+      // Apply field filters to notes for this category (only if not searching)
+      let displayNotes = notes;
+      if (!searchQuery) {
+        displayNotes = applyFieldFilters(notes, categoryKey);
+      }
+
+      if (displayNotes.length === 0) {
+        const message = !searchQuery && notes.length > 0 && displayNotes.length === 0
+          ? `No ${category.name.toLowerCase()} match the current filters.`
+          : `No ${category.name.toLowerCase()} yet.`;
+        category.listEl.innerHTML = `<li><em>${message}</em></li>`;
       } else {
-        notes.forEach(note => {
+        displayNotes.forEach(note => {
           const originalIndex = notesData.indexOf(note);
           category.listEl.appendChild(createListItem(note, originalIndex));
         });
@@ -474,6 +618,18 @@
     const drinkSubTypes = ['beer', 'wine', 'cocktail'];
     resourceTags.forEach(tag => {
       if (drinkSubTypes.includes(tag)) {
+        // Add as hashtag if not already present
+        if (!hashTags.includes(tag)) {
+          hashTags.push(tag);
+        }
+      }
+    });
+
+    // Auto-add hashtags for activity sub-types (hike, concert, museum, etc.)
+    // If someone types "hike: Blue Hills", automatically add #hike
+    const activitySubTypes = ['hike', 'hiking', 'concert', 'museum', 'theater', 'gallery', 'event'];
+    resourceTags.forEach(tag => {
+      if (activitySubTypes.includes(tag)) {
         // Add as hashtag if not already present
         if (!hashTags.includes(tag)) {
           hashTags.push(tag);

@@ -54,6 +54,7 @@
     <button class="tab" data-category="show" role="tab" aria-selected="false">Shows</button>
     <button class="tab" data-category="restaurant" role="tab" aria-selected="false">Restaurants</button>
     <button class="tab" data-category="drink" role="tab" aria-selected="false">Drinks</button>
+    <button class="tab" data-category="activity" role="tab" aria-selected="false">Activities</button>
     <button class="tab" data-category="other" role="tab" aria-selected="false">Other</button>
   </div>
 
@@ -62,21 +63,31 @@
       <ul class="note-list" id="allList"></ul>
     </section>
     <section class="notes-category active" id="booksSection" role="tabpanel">
+      <div class="filter-container" id="booksFilters"></div>
       <ul class="note-list" id="booksList"></ul>
     </section>
     <section class="notes-category" id="moviesSection" role="tabpanel">
+      <div class="filter-container" id="moviesFilters"></div>
       <ul class="note-list" id="moviesList"></ul>
     </section>
     <section class="notes-category" id="showsSection" role="tabpanel">
+      <div class="filter-container" id="showsFilters"></div>
       <ul class="note-list" id="showsList"></ul>
     </section>
     <section class="notes-category" id="restaurantsSection" role="tabpanel">
+      <div class="filter-container" id="restaurantsFilters"></div>
       <ul class="note-list" id="restaurantsList"></ul>
     </section>
     <section class="notes-category" id="drinksSection" role="tabpanel">
+      <div class="filter-container" id="drinksFilters"></div>
       <ul class="note-list" id="drinksList"></ul>
     </section>
+    <section class="notes-category" id="activitiesSection" role="tabpanel">
+      <div class="filter-container" id="activitiesFilters"></div>
+      <ul class="note-list" id="activitiesList"></ul>
+    </section>
     <section class="notes-category" id="otherSection" role="tabpanel">
+      <div class="filter-container" id="otherFilters"></div>
       <ul class="note-list" id="otherList"></ul>
     </section>
   </div>
@@ -86,12 +97,12 @@
     <strong>Format:</strong> <code>category: Title, key:value, #tag, notes</code>
   </div>
   <div style="margin-top: 0.3rem;">
-    <strong>Categories:</strong> <code>book</code> <code>movie</code> <code>show</code> <code>restaurant</code> <code>drink</code> |
-    <strong>Fields:</strong> <code>genre:sci-fi</code> <code>rating:5</code> <code>brewery:treehouse</code> |
-    <strong>Tags:</strong> <code>#sports</code> <code>#inspiring</code> <code>#beer</code>
+    <strong>Categories:</strong> <code>book</code> <code>movie</code> <code>show</code> <code>restaurant</code> <code>drink</code> <code>activity</code> |
+    <strong>Fields:</strong> <code>genre:sci-fi</code> <code>rating:5</code> <code>location:boston</code> |
+    <strong>Tags:</strong> <code>#sports</code> <code>#inspiring</code> <code>#hike</code>
   </div>
   <div style="margin-top: 0.3rem; font-size: 0.8rem; opacity: 0.8;">
-    Example: <code>drink: Julius, brewery:treehouse, #beer, hazy and delicious</code>
+    Examples: <code>drink: Julius, brewery:treehouse, #beer, hazy and delicious</code> | <code>activity: Blue Hills hike, location:milton, #outdoors</code>
   </div>
 </footer>
 
