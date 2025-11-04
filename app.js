@@ -50,14 +50,14 @@
 
   // Define categories
   const CATEGORIES = {
-    all: { name: 'All Results', listEl: allList, sectionEl: document.getElementById('allSection'), aliases: [] },
-    book: { name: 'Books', listEl: booksList, sectionEl: document.getElementById('booksSection'), aliases: ['book', 'books'] },
-    movie: { name: 'Movies', listEl: moviesList, sectionEl: document.getElementById('moviesSection'), aliases: ['movie', 'movies', 'film', 'films'] },
-    show: { name: 'Shows', listEl: showsList, sectionEl: document.getElementById('showsSection'), aliases: ['show', 'shows', 'tv', 'series'] },
-    restaurant: { name: 'Restaurants', listEl: restaurantsList, sectionEl: document.getElementById('restaurantsSection'), aliases: ['restaurant', 'restaurants'] },
-    drink: { name: 'Drinks', listEl: drinksList, sectionEl: document.getElementById('drinksSection'), aliases: ['drink', 'drinks', 'beer', 'wine', 'cocktail'] },
-    activity: { name: 'Activities', listEl: activitiesList, sectionEl: document.getElementById('activitiesSection'), aliases: ['activity', 'activities', 'hike', 'hiking', 'concert', 'museum', 'theater', 'gallery', 'event'] },
-    other: { name: 'Other', listEl: otherList, sectionEl: document.getElementById('otherSection'), aliases: [] }
+    all: { name: 'All Results', listEl: allList, sectionEl: document.getElementById('allSection'), filterId: 'allFilters', aliases: [] },
+    book: { name: 'Books', listEl: booksList, sectionEl: document.getElementById('booksSection'), filterId: 'booksFilters', aliases: ['book', 'books'] },
+    movie: { name: 'Movies', listEl: moviesList, sectionEl: document.getElementById('moviesSection'), filterId: 'moviesFilters', aliases: ['movie', 'movies', 'film', 'films'] },
+    show: { name: 'Shows', listEl: showsList, sectionEl: document.getElementById('showsSection'), filterId: 'showsFilters', aliases: ['show', 'shows', 'tv', 'series'] },
+    restaurant: { name: 'Restaurants', listEl: restaurantsList, sectionEl: document.getElementById('restaurantsSection'), filterId: 'restaurantsFilters', aliases: ['restaurant', 'restaurants'] },
+    drink: { name: 'Drinks', listEl: drinksList, sectionEl: document.getElementById('drinksSection'), filterId: 'drinksFilters', aliases: ['drink', 'drinks', 'beer', 'wine', 'cocktail'] },
+    activity: { name: 'Activities', listEl: activitiesList, sectionEl: document.getElementById('activitiesSection'), filterId: 'activitiesFilters', aliases: ['activity', 'activities', 'hike', 'hiking', 'concert', 'museum', 'theater', 'gallery', 'event'] },
+    other: { name: 'Other', listEl: otherList, sectionEl: document.getElementById('otherSection'), filterId: 'otherFilters', aliases: [] }
   };
 
   // Load notes from localStorage
@@ -336,12 +336,12 @@
   function filterNotes() {
     if (!searchQuery) return notesData;
 
-    // Split search query into individual terms for OR logic
+    // Split search query into individual terms for AND logic
     const terms = searchQuery.toLowerCase().split(/\s+/).filter(t => t.length > 0);
 
     return notesData.filter(note => {
-      // Check if ANY search term matches ANY field in the note
-      return terms.some(term => {
+      // Check if ALL search terms match ANY field in the note
+      return terms.every(term => {
         const titleMatch = note.title && note.title.toLowerCase().includes(term);
         const notesMatch = note.notes && note.notes.toLowerCase().includes(term);
         const rawMatch = note.raw && note.raw.toLowerCase().includes(term);
@@ -375,7 +375,7 @@
   function generateCategoryFilters(categoryKey) {
     if (categoryKey === 'all') return; // No filters for "All Results" view
 
-    const filterContainer = document.getElementById(`${categoryKey === 'book' ? 'books' : categoryKey === 'movie' ? 'movies' : categoryKey === 'show' ? 'shows' : categoryKey === 'restaurant' ? 'restaurants' : categoryKey === 'drink' ? 'drinks' : categoryKey === 'activity' ? 'activities' : 'other'}Filters`);
+    const filterContainer = document.getElementById(CATEGORIES[categoryKey].filterId);
     if (!filterContainer) return;
 
     // Get all notes for this category
