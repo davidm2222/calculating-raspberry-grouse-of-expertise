@@ -47,17 +47,43 @@
   const AUTOCOMPLETE_KEY = "smartNotesAutocomplete";
   const ACTIVE_TAB_KEY = "smartNotesActiveTab";
   const VIEW_MODE_KEY = "smartNotesViewMode";
+  const CUSTOM_SUBTYPES_KEY = "smartNotesCustomSubtypes";
 
   // Define categories
   const CATEGORIES = {
-    all: { name: 'All Results', listEl: allList, sectionEl: document.getElementById('allSection'), filterId: 'allFilters', aliases: [] },
-    book: { name: 'Books', listEl: booksList, sectionEl: document.getElementById('booksSection'), filterId: 'booksFilters', aliases: ['book', 'books'] },
-    movie: { name: 'Movies', listEl: moviesList, sectionEl: document.getElementById('moviesSection'), filterId: 'moviesFilters', aliases: ['movie', 'movies', 'film', 'films'] },
-    show: { name: 'Shows', listEl: showsList, sectionEl: document.getElementById('showsSection'), filterId: 'showsFilters', aliases: ['show', 'shows', 'tv', 'series'] },
-    restaurant: { name: 'Restaurants', listEl: restaurantsList, sectionEl: document.getElementById('restaurantsSection'), filterId: 'restaurantsFilters', aliases: ['restaurant', 'restaurants'] },
-    drink: { name: 'Drinks', listEl: drinksList, sectionEl: document.getElementById('drinksSection'), filterId: 'drinksFilters', aliases: ['drink', 'drinks', 'beer', 'wine', 'cocktail'] },
-    activity: { name: 'Activities', listEl: activitiesList, sectionEl: document.getElementById('activitiesSection'), filterId: 'activitiesFilters', aliases: ['activity', 'activities', 'hike', 'hiking', 'concert', 'museum', 'theater', 'gallery', 'event'] },
-    other: { name: 'Other', listEl: otherList, sectionEl: document.getElementById('otherSection'), filterId: 'otherFilters', aliases: [] }
+    all: { name: 'All Results', listEl: allList, sectionEl: document.getElementById('allSection'), filterId: 'allFilters', aliases: [], subtypes: null },
+    book: { name: 'Books', listEl: booksList, sectionEl: document.getElementById('booksSection'), filterId: 'booksFilters', aliases: ['book', 'books'], subtypes: null },
+    movie: { name: 'Movies', listEl: moviesList, sectionEl: document.getElementById('moviesSection'), filterId: 'moviesFilters', aliases: ['movie', 'movies', 'film', 'films'], subtypes: null },
+    show: { name: 'Shows', listEl: showsList, sectionEl: document.getElementById('showsSection'), filterId: 'showsFilters', aliases: ['show', 'shows', 'tv', 'series'], subtypes: null },
+    restaurant: { name: 'Restaurants', listEl: restaurantsList, sectionEl: document.getElementById('restaurantsSection'), filterId: 'restaurantsFilters', aliases: ['restaurant', 'restaurants'], subtypes: null },
+    drink: {
+      name: 'Drinks',
+      listEl: drinksList,
+      sectionEl: document.getElementById('drinksSection'),
+      filterId: 'drinksFilters',
+      icon: '🍹',
+      aliases: ['drink', 'drinks'],
+      subtypes: {
+        beer: { name: 'Beer', icon: '🍺', aliases: ['beer', 'ipa', 'lager', 'ale', 'stout', 'porter'] },
+        wine: { name: 'Wine', icon: '🍷', aliases: ['wine', 'red', 'white', 'rosé', 'rose', 'champagne', 'prosecco'] },
+        cocktail: { name: 'Cocktail', icon: '🍸', aliases: ['cocktail', 'mixed drink', 'martini'] }
+      }
+    },
+    activity: {
+      name: 'Activities',
+      listEl: activitiesList,
+      sectionEl: document.getElementById('activitiesSection'),
+      filterId: 'activitiesFilters',
+      icon: '🎭',
+      aliases: ['activity', 'activities', 'event'],
+      subtypes: {
+        hike: { name: 'Hike', icon: '🥾', aliases: ['hike', 'hiking', 'trail', 'trek'] },
+        concert: { name: 'Concert', icon: '🎸', aliases: ['concert', 'show', 'gig', 'festival'] },
+        museum: { name: 'Museum', icon: '🏛️', aliases: ['museum', 'gallery', 'exhibit', 'exhibition'] },
+        theater: { name: 'Theater', icon: '🎭', aliases: ['theater', 'theatre', 'play'] }
+      }
+    },
+    other: { name: 'Other', listEl: otherList, sectionEl: document.getElementById('otherSection'), filterId: 'otherFilters', aliases: [], subtypes: null }
   };
 
   // Load notes from localStorage
@@ -68,6 +94,8 @@
   let activeTab = 'book'; // Default to Books tab
   let viewMode = 'comfort'; // 'compact' or 'comfort'
   let activeFilters = {}; // Store active filter selections per category { categoryKey: { fieldKey: value } }
+  let customSubtypes = {}; // User-defined subtypes per category { categoryKey: { subtypeName: { icon, confirmed } } }
+  let activeSubtype = {}; // Active subtype filter per category { categoryKey: subtypeName }
 
   async function loadNotes() {
     if (!currentUser) return;
@@ -139,6 +167,86 @@
     localStorage.setItem(AUTOCOMPLETE_KEY, JSON.stringify(autocompleteData));
   }
 
+  // Load custom subtypes from Supabase and cache in localStorage
+  async function loadCustomSubtypes() {
+    if (!currentUser) return;
+
+    try {
+      // First load from localStorage (fast)
+      const cached = localStorage.getItem(CUSTOM_SUBTYPES_KEY);
+      if (cached) {
+        try {
+          customSubtypes = JSON.parse(cached);
+        } catch (e) {
+          customSubtypes = {};
+        }
+      }
+
+      // Then sync from Supabase (source of truth)
+      const { data, error } = await supabase
+        .from('user_custom_subtypes')
+        .select('*')
+        .eq('user_id', currentUser.id);
+
+      if (error) throw error;
+
+      // Rebuild custom subtypes from Supabase data
+      const subtypesFromDB = {};
+      if (data) {
+        data.forEach(row => {
+          if (!subtypesFromDB[row.category_key]) {
+            subtypesFromDB[row.category_key] = {};
+          }
+          subtypesFromDB[row.category_key][row.subtype_name] = {
+            icon: row.icon || '📌',
+            confirmed: true
+          };
+        });
+      }
+
+      // Update state and cache
+      customSubtypes = subtypesFromDB;
+      localStorage.setItem(CUSTOM_SUBTYPES_KEY, JSON.stringify(customSubtypes));
+    } catch (error) {
+      console.error('Error loading custom subtypes:', error);
+    }
+  }
+
+  // Save a new custom subtype
+  async function saveCustomSubtype(categoryKey, subtypeName, icon = '📌') {
+    if (!currentUser) return;
+
+    try {
+      // Optimistically update localStorage
+      if (!customSubtypes[categoryKey]) {
+        customSubtypes[categoryKey] = {};
+      }
+      customSubtypes[categoryKey][subtypeName] = { icon, confirmed: true };
+      localStorage.setItem(CUSTOM_SUBTYPES_KEY, JSON.stringify(customSubtypes));
+
+      // Save to Supabase
+      const { error } = await supabase
+        .from('user_custom_subtypes')
+        .upsert({
+          user_id: currentUser.id,
+          category_key: categoryKey,
+          subtype_name: subtypeName,
+          icon: icon
+        }, {
+          onConflict: 'user_id,category_key,subtype_name'
+        });
+
+      if (error) throw error;
+    } catch (error) {
+      console.error('Error saving custom subtype:', error);
+      // Revert optimistic update
+      if (customSubtypes[categoryKey]) {
+        delete customSubtypes[categoryKey][subtypeName];
+        localStorage.setItem(CUSTOM_SUBTYPES_KEY, JSON.stringify(customSubtypes));
+      }
+    }
+  }
+
   // Save notes - no longer needed for individual operations
   // Notes are saved directly to Supabase in addNote, saveEdit, deleteNote
   function saveNotes() {
@@ -176,6 +284,9 @@
       const isActive = key === categoryKey;
       category.sectionEl.classList.toggle('active', isActive);
     });
+
+    // Generate subtype pills for this category
+    generateSubtypePills(categoryKey);
   }
 
   // Load view mode from localStorage
@@ -256,6 +367,19 @@
         badge.className = "category-badge";
         badge.textContent = categoryName.toUpperCase();
         titleEl.appendChild(badge);
+      }
+
+      // Add resource type badge for multi-subtype categories (Drinks, Activities)
+      const categoryKey = getCategoryForNote(note);
+      const category = CATEGORIES[categoryKey];
+      if (category && category.subtypes) {
+        const subtype = getSubtypeForNote(note);
+        if (subtype) {
+          const typeBadge = document.createElement("span");
+          typeBadge.className = "resource-type-badge";
+          typeBadge.textContent = `${subtype.icon} ${subtype.name.toUpperCase()}`;
+          titleEl.appendChild(typeBadge);
+        }
       }
 
       const titleText = document.createTextNode(note.title);
@@ -476,13 +600,196 @@
     renderNotes();
   }
 
+  // Generate subtype pills for a category
+  function generateSubtypePills(categoryKey) {
+    const pillsContainer = document.getElementById('subtypePills');
+    const category = CATEGORIES[categoryKey];
+
+    // Get all notes for this category
+    const categoryNotes = notesData.filter(note => getCategoryForNote(note) === categoryKey);
+
+    if (categoryNotes.length === 0) {
+      pillsContainer.style.display = 'none';
+      pillsContainer.innerHTML = '';
+      return;
+    }
+
+    // Special handling for "Other" tab - dynamically discover types
+    if (categoryKey === 'other') {
+      const discoveredTypes = {};
+      categoryNotes.forEach(note => {
+        if (note.tags && note.tags.length > 0) {
+          const typeKey = note.tags[0].toLowerCase();
+          if (!discoveredTypes[typeKey]) {
+            discoveredTypes[typeKey] = { count: 0, name: note.tags[0] };
+          }
+          discoveredTypes[typeKey].count++;
+        }
+      });
+
+      // Only show pills if there are multiple types in Other
+      const typeCount = Object.keys(discoveredTypes).length;
+      if (typeCount <= 1) {
+        pillsContainer.style.display = 'none';
+        pillsContainer.innerHTML = '';
+        return;
+      }
+
+      // Build pills for discovered types
+      let pillsHTML = '';
+      const allActive = !activeSubtype[categoryKey] || activeSubtype[categoryKey] === 'all';
+      const totalCount = categoryNotes.length;
+
+      pillsHTML += `
+        <button class="subtype-pill ${allActive ? 'active' : ''}" data-category="${categoryKey}" data-subtype="all">
+          All <span class="subtype-pill-count">(${totalCount})</span>
+        </button>
+      `;
+
+      Object.entries(discoveredTypes).forEach(([typeKey, typeInfo]) => {
+        const isActive = activeSubtype[categoryKey] === typeKey;
+        const displayName = typeInfo.name.charAt(0).toUpperCase() + typeInfo.name.slice(1);
+        pillsHTML += `
+          <button class="subtype-pill ${isActive ? 'active' : ''}" data-category="${categoryKey}" data-subtype="${typeKey}">
+            📋 ${displayName} <span class="subtype-pill-count">(${typeInfo.count})</span>
+          </button>
+        `;
+      });
+
+      pillsContainer.innerHTML = pillsHTML;
+      pillsContainer.style.display = 'flex';
+
+      // Add click handlers
+      pillsContainer.querySelectorAll('.subtype-pill').forEach(pill => {
+        pill.addEventListener('click', handleSubtypePillClick);
+      });
+      return;
+    }
+
+    // Hide pills if category doesn't have pre-defined subtypes
+    if (!category || !category.subtypes) {
+      pillsContainer.style.display = 'none';
+      pillsContainer.innerHTML = '';
+      return;
+    }
+
+    // Count notes per subtype (for categories with pre-defined subtypes)
+    const subtypeCounts = {};
+    let totalCount = 0;
+
+    // Count pre-defined subtypes
+    Object.keys(category.subtypes).forEach(subtypeKey => {
+      subtypeCounts[subtypeKey] = 0;
+    });
+
+    // Count custom subtypes
+    if (customSubtypes[categoryKey]) {
+      Object.keys(customSubtypes[categoryKey]).forEach(subtypeName => {
+        subtypeCounts[subtypeName] = 0;
+      });
+    }
+
+    // Count notes for each subtype
+    categoryNotes.forEach(note => {
+      const subtype = getSubtypeForNote(note);
+      if (subtype) {
+        subtypeCounts[subtype.key] = (subtypeCounts[subtype.key] || 0) + 1;
+        totalCount++;
+      }
+    });
+
+    // Build pills HTML
+    let pillsHTML = '';
+
+    // "All" pill
+    const allActive = !activeSubtype[categoryKey] || activeSubtype[categoryKey] === 'all';
+    pillsHTML += `
+      <button class="subtype-pill ${allActive ? 'active' : ''}" data-category="${categoryKey}" data-subtype="all">
+        All <span class="subtype-pill-count">(${totalCount})</span>
+      </button>
+    `;
+
+    // Pre-defined subtype pills
+    Object.entries(category.subtypes).forEach(([subtypeKey, subtype]) => {
+      const count = subtypeCounts[subtypeKey] || 0;
+      if (count > 0) {
+        const isActive = activeSubtype[categoryKey] === subtypeKey;
+        pillsHTML += `
+          <button class="subtype-pill ${isActive ? 'active' : ''}" data-category="${categoryKey}" data-subtype="${subtypeKey}">
+            ${subtype.icon} ${subtype.name} <span class="subtype-pill-count">(${count})</span>
+          </button>
+        `;
+      }
+    });
+
+    // Custom subtype pills
+    if (customSubtypes[categoryKey]) {
+      Object.entries(customSubtypes[categoryKey]).forEach(([subtypeName, subtypeData]) => {
+        const count = subtypeCounts[subtypeName] || 0;
+        if (count > 0) {
+          const isActive = activeSubtype[categoryKey] === subtypeName;
+          const displayName = subtypeName.charAt(0).toUpperCase() + subtypeName.slice(1);
+          pillsHTML += `
+            <button class="subtype-pill ${isActive ? 'active' : ''}" data-category="${categoryKey}" data-subtype="${subtypeName}">
+              ${subtypeData.icon} ${displayName} <span class="subtype-pill-count">(${count})</span>
+            </button>
+          `;
+        }
+      });
+    }
+
+    pillsContainer.innerHTML = pillsHTML;
+    pillsContainer.style.display = totalCount > 0 ? 'flex' : 'none';
+
+    // Add click handlers
+    pillsContainer.querySelectorAll('.subtype-pill').forEach(pill => {
+      pill.addEventListener('click', handleSubtypePillClick);
+    });
+  }
+
+  // Handle subtype pill click
+  function handleSubtypePillClick(e) {
+    const categoryKey = e.currentTarget.dataset.category;
+    const subtypeKey = e.currentTarget.dataset.subtype;
+
+    if (subtypeKey === 'all') {
+      delete activeSubtype[categoryKey];
+    } else {
+      activeSubtype[categoryKey] = subtypeKey;
+    }
+
+    renderNotes();
+  }
+
   // Determine which category a note belongs to
   function getCategoryForNote(note) {
     if (!note.tags || note.tags.length === 0) return 'other';
 
-    // Check if any tag matches a category alias
+    const firstTag = note.tags[0].toLowerCase();
+
+    // First, check custom user-defined subtypes
+    for (const [categoryKey, subtypes] of Object.entries(customSubtypes)) {
+      if (subtypes[firstTag]) {
+        return categoryKey;
+      }
+    }
+
+    // Second, check pre-defined subtypes
     for (const [categoryKey, category] of Object.entries(CATEGORIES)) {
-      if (categoryKey === 'other' || categoryKey === 'all') continue; // Skip 'other' and 'all', 'other' is the default
+      if (categoryKey === 'other' || categoryKey === 'all') continue;
+
+      if (category.subtypes) {
+        for (const [subtypeKey, subtype] of Object.entries(category.subtypes)) {
+          if (subtype.aliases.includes(firstTag)) {
+            return categoryKey;
+          }
+        }
+      }
+    }
+
+    // Finally, check category-level aliases
+    for (const [categoryKey, category] of Object.entries(CATEGORIES)) {
+      if (categoryKey === 'other' || categoryKey === 'all') continue;
 
       for (const tag of note.tags) {
         if (category.aliases.includes(tag.toLowerCase())) {
@@ -492,6 +799,41 @@
     }
 
     return 'other';
+  }
+
+  // Helper function to get subtype info for a note
+  function getSubtypeForNote(note) {
+    if (!note.tags || note.tags.length === 0) return null;
+
+    const firstTag = note.tags[0].toLowerCase();
+    const categoryKey = getCategoryForNote(note);
+    const category = CATEGORIES[categoryKey];
+
+    if (!category || !category.subtypes) return null;
+
+    // Check custom subtypes first
+    if (customSubtypes[categoryKey] && customSubtypes[categoryKey][firstTag]) {
+      return {
+        key: firstTag,
+        name: firstTag.charAt(0).toUpperCase() + firstTag.slice(1),
+        icon: customSubtypes[categoryKey][firstTag].icon,
+        isCustom: true
+      };
+    }
+
+    // Check pre-defined subtypes
+    for (const [subtypeKey, subtype] of Object.entries(category.subtypes)) {
+      if (subtype.aliases.includes(firstTag)) {
+        return {
+          key: subtypeKey,
+          name: subtype.name,
+          icon: subtype.icon,
+          isCustom: false
+        };
+      }
+    }
+
+    return null;
   }
 
   // Render all notes
@@ -565,12 +907,27 @@
       // Generate filter UI for this category (only if not searching)
       if (!searchQuery) {
         generateCategoryFilters(categoryKey);
+        generateSubtypePills(categoryKey);
       }
 
       // Apply field filters to notes for this category (only if not searching)
       let displayNotes = notes;
       if (!searchQuery) {
         displayNotes = applyFieldFilters(notes, categoryKey);
+
+        // Apply subtype filter if active
+        if (activeSubtype[categoryKey] && activeSubtype[categoryKey] !== 'all') {
+          displayNotes = displayNotes.filter(note => {
+            // For "Other" tab, filter by first tag (dynamic types)
+            if (categoryKey === 'other') {
+              return note.tags && note.tags.length > 0 && note.tags[0].toLowerCase() === activeSubtype[categoryKey];
+            }
+
+            // For categories with pre-defined subtypes, use getSubtypeForNote
+            const subtype = getSubtypeForNote(note);
+            return subtype && subtype.key === activeSubtype[categoryKey];
+          });
+        }
       }
 
       if (displayNotes.length === 0) {
@@ -613,27 +970,37 @@
       resourceTags = ['note'];
     }
 
-    // Auto-add hashtags for drink sub-types (beer, wine, cocktail)
-    // If someone types "beer: Heady Topper", automatically add #beer
-    const drinkSubTypes = ['beer', 'wine', 'cocktail'];
+    // Auto-add hashtags for all subtypes (beer, wine, hike, concert, etc.)
+    // This works for both pre-defined subtypes and custom user-defined subtypes
     resourceTags.forEach(tag => {
-      if (drinkSubTypes.includes(tag)) {
-        // Add as hashtag if not already present
-        if (!hashTags.includes(tag)) {
-          hashTags.push(tag);
+      let isSubtype = false;
+
+      // Check if tag is a pre-defined subtype
+      for (const category of Object.values(CATEGORIES)) {
+        if (category.subtypes) {
+          for (const subtype of Object.values(category.subtypes)) {
+            if (subtype.aliases.includes(tag.toLowerCase())) {
+              isSubtype = true;
+              break;
+            }
+          }
+        }
+        if (isSubtype) break;
+      }
+
+      // Check if tag is a custom subtype
+      if (!isSubtype) {
+        for (const subtypes of Object.values(customSubtypes)) {
+          if (subtypes[tag.toLowerCase()]) {
+            isSubtype = true;
+            break;
+          }
         }
       }
-    });
 
-    // Auto-add hashtags for activity sub-types (hike, concert, museum, etc.)
-    // If someone types "hike: Blue Hills", automatically add #hike
-    const activitySubTypes = ['hike', 'hiking', 'concert', 'museum', 'theater', 'gallery', 'event'];
-    resourceTags.forEach(tag => {
-      if (activitySubTypes.includes(tag)) {
-        // Add as hashtag if not already present
-        if (!hashTags.includes(tag)) {
-          hashTags.push(tag);
-        }
+      // Add as hashtag if it's a subtype and not already present
+      if (isSubtype && !hashTags.includes(tag)) {
+        hashTags.push(tag);
       }
     });
 
@@ -809,11 +1176,12 @@
         timestamp: data.timestamp
       });
 
-      // Switch to the tab where this note belongs
+      // Render notes first (this will regenerate pills with correct counts)
+      renderNotes();
+
+      // Then switch to the tab where this note belongs (pills already generated)
       const category = getCategoryForNote(note);
       switchTab(category);
-
-      renderNotes();
     } catch (error) {
       console.error('Error adding note:', error);
       alert('Failed to save note. Please try again.');
@@ -978,6 +1346,7 @@
             userEmail.textContent = currentUser.email;
             userEmail.style.display = 'inline';
             logoutBtn.style.display = 'inline';
+            await loadCustomSubtypes();
             await loadNotes();
           } else {
             // Email confirmation required
@@ -1003,7 +1372,8 @@
         userEmail.style.display = 'inline';
         logoutBtn.style.display = 'inline';
 
-        // Load user's notes
+        // Load user's custom subtypes and notes
+        await loadCustomSubtypes();
         await loadNotes();
       }
     } catch (error) {
@@ -1059,6 +1429,7 @@
       userEmail.textContent = currentUser.email;
       userEmail.style.display = 'inline';
       logoutBtn.style.display = 'inline';
+      await loadCustomSubtypes();
       await loadNotes();
     }
   }
