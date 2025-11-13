@@ -605,13 +605,6 @@
     const pillsContainer = document.getElementById('subtypePills');
     const category = CATEGORIES[categoryKey];
 
-    // Hide pills if category doesn't have subtypes
-    if (!category || !category.subtypes) {
-      pillsContainer.style.display = 'none';
-      pillsContainer.innerHTML = '';
-      return;
-    }
-
     // Get all notes for this category
     const categoryNotes = notesData.filter(note => getCategoryForNote(note) === categoryKey);
 
@@ -621,7 +614,66 @@
       return;
     }
 
-    // Count notes per subtype
+    // Special handling for "Other" tab - dynamically discover types
+    if (categoryKey === 'other') {
+      const discoveredTypes = {};
+      categoryNotes.forEach(note => {
+        if (note.tags && note.tags.length > 0) {
+          const typeKey = note.tags[0].toLowerCase();
+          if (!discoveredTypes[typeKey]) {
+            discoveredTypes[typeKey] = { count: 0, name: note.tags[0] };
+          }
+          discoveredTypes[typeKey].count++;
+        }
+      });
+
+      // Only show pills if there are multiple types in Other
+      const typeCount = Object.keys(discoveredTypes).length;
+      if (typeCount <= 1) {
+        pillsContainer.style.display = 'none';
+        pillsContainer.innerHTML = '';
+        return;
+      }
+
+      // Build pills for discovered types
+      let pillsHTML = '';
+      const allActive = !activeSubtype[categoryKey] || activeSubtype[categoryKey] === 'all';
+      const totalCount = categoryNotes.length;
+
+      pillsHTML += `
+        <button class="subtype-pill ${allActive ? 'active' : ''}" data-category="${categoryKey}" data-subtype="all">
+          All <span class="subtype-pill-count">(${totalCount})</span>
+        </button>
+      `;
+
+      Object.entries(discoveredTypes).forEach(([typeKey, typeInfo]) => {
+        const isActive = activeSubtype[categoryKey] === typeKey;
+        const displayName = typeInfo.name.charAt(0).toUpperCase() + typeInfo.name.slice(1);
+        pillsHTML += `
+          <button class="subtype-pill ${isActive ? 'active' : ''}" data-category="${categoryKey}" data-subtype="${typeKey}">
+            📋 ${displayName} <span class="subtype-pill-count">(${typeInfo.count})</span>
+          </button>
+        `;
+      });
+
+      pillsContainer.innerHTML = pillsHTML;
+      pillsContainer.style.display = 'flex';
+
+      // Add click handlers
+      pillsContainer.querySelectorAll('.subtype-pill').forEach(pill => {
+        pill.addEventListener('click', handleSubtypePillClick);
+      });
+      return;
+    }
+
+    // Hide pills if category doesn't have pre-defined subtypes
+    if (!category || !category.subtypes) {
+      pillsContainer.style.display = 'none';
+      pillsContainer.innerHTML = '';
+      return;
+    }
+
+    // Count notes per subtype (for categories with pre-defined subtypes)
     const subtypeCounts = {};
     let totalCount = 0;
 
@@ -866,6 +918,12 @@
         // Apply subtype filter if active
         if (activeSubtype[categoryKey] && activeSubtype[categoryKey] !== 'all') {
           displayNotes = displayNotes.filter(note => {
+            // For "Other" tab, filter by first tag (dynamic types)
+            if (categoryKey === 'other') {
+              return note.tags && note.tags.length > 0 && note.tags[0].toLowerCase() === activeSubtype[categoryKey];
+            }
+
+            // For categories with pre-defined subtypes, use getSubtypeForNote
             const subtype = getSubtypeForNote(note);
             return subtype && subtype.key === activeSubtype[categoryKey];
           });
@@ -1118,11 +1176,12 @@
         timestamp: data.timestamp
       });
 
-      // Switch to the tab where this note belongs
+      // Render notes first (this will regenerate pills with correct counts)
+      renderNotes();
+
+      // Then switch to the tab where this note belongs (pills already generated)
       const category = getCategoryForNote(note);
       switchTab(category);
-
-      renderNotes();
     } catch (error) {
       console.error('Error adding note:', error);
       alert('Failed to save note. Please try again.');
